@@ -79,7 +79,7 @@ async def watch_plant(
             client = await GivClientAsync.get_connection(cold_start=True)
 ######### Is there a way to just refresh plant here rather than detect again? ##########
             logger.critical("Detecting inverter characteristics...")
-            await client.detect_plant()
+            await client.detect_plant(lite = GiV_Settings.lite_query)
             await client.refresh_plant(True, number_batteries=client.plant.number_batteries,meter_list=client.plant.meter_list)
             #await client.close()
             if client.plant.device_type==Model.GATEWAY:
@@ -924,7 +924,10 @@ def processPVInfo(plant: Plant):
         ######## Get Meter Details ########
 
         meters={}
-        meters.update(getMeters(plant))
+        if Giv_Settings.lite_query:
+            logger.debug("Lite query set, no meter stats")
+        else:
+            meters.update(getMeters(plant))
 
         ######## Get Battery Details ########
 
@@ -1307,18 +1310,26 @@ def processInverterInfo(plant: Plant):
         ######## Get Meter Details ########
 
         meters={}
-        meters.update(getMeters(plant))
+        if GiV_Settings.lite_query:
+            logger.debug("Lite query: No meter stats")
+        else:
+            meters.update(getMeters(plant))
 
         ######## Get Battery Details ########
 
         batteries2 = {}
-        batteries2.update(getBatteries(plant,multi_output_old))
-        if isHV:
-            # Calc HV stack capacity as function of stacks
-            cap=0
-            for stack in batteries2:
-                cap=cap+batteries2[stack]['Stack_Design_Capacity']                  #Ah x nom voltage @ 90%
-            inverter['Battery_Capacity_kWh_calc'] = cap
+        if GiV_Settings.lite_query:
+            logger.debug("Lite query: No battery stats")
+            if isHV:
+                inverter['Battery_Capacity_kWh_calc'] = 0
+        else:
+            batteries2.update(getBatteries(plant,multi_output_old))
+            if isHV:
+                # Calc HV stack capacity as function of stacks
+                cap=0
+                for stack in batteries2:
+                    cap=cap+batteries2[stack]['Stack_Design_Capacity']                  #Ah x nom voltage @ 90%
+                inverter['Battery_Capacity_kWh_calc'] = cap
 
             ######## Create multioutput and publish #########
         energy = {}
@@ -1740,7 +1751,10 @@ def processGatewayInfo(plant: Plant):
         ######## Get Meter Details ########
 
         meters={}
-        meters.update(getMeters(plant))
+        if GiV_Settings.lite_query:
+            logger.debug("Lite query: No meter stats")
+        else:
+            meters.update(getMeters(plant))
 
         if GiV_Settings.Print_Raw_Registers:
             multi_output['raw'] = getRaw(plant)
@@ -1879,14 +1893,17 @@ def processThreePhaseInfo(plant: Plant):
         ######## Get Battery Details ########
 
         batteries2 = {}
-        batteries2=getBatteries(plant,multi_output_old)
+        if GiV_Settings.lite_query:
+            power_output['SOC_kWh'] = 0
+        else:
+            batteries2=getBatteries(plant,multi_output_old)
 
-        sockwh=0
-        count=0
-        for stack in batteries2:
-            sockwh=sockwh+batteries2[stack]['Stack_SOC_kWh']
-            count+=1
-        power_output['SOC_kWh'] = sockwh/count                                         # Average SOC of all stacks...
+            sockwh=0
+            count=0
+            for stack in batteries2:
+                sockwh=sockwh+batteries2[stack]['Stack_SOC_kWh']
+                count+=1
+            power_output['SOC_kWh'] = sockwh/count                                         # Average SOC of all stacks...
 
         inverter['status']=GEInv.status.name.capitalize()
         inverter['System_Mode']=GEInv.system_mode.name.capitalize()
@@ -1900,8 +1917,9 @@ def processThreePhaseInfo(plant: Plant):
 
     # Calc HV stack capacity as function of stacks
         cap=0
-        for stack in batteries2:
-            cap=cap+batteries2[stack]['Stack_Design_Capacity']
+        if not GiV_Settings.lite_query:
+            for stack in batteries2:
+                cap=cap+batteries2[stack]['Stack_Design_Capacity']
         inverter['Battery_Capacity_kWh'] = cap
 
         inverter['Inverter_Temperature']=GEInv.t_inverter
@@ -1943,7 +1961,10 @@ def processThreePhaseInfo(plant: Plant):
         ######## Get Meter Details ########
 
         meters={}
-        meters.update(getMeters(plant))
+        if GiV_Settings.lite_query:
+            logger.debug("Lite query: No meter stats")
+        else:
+            meters.update(getMeters(plant))
 
         timeslots={}
         logger.debug("Getting TimeSlot data")

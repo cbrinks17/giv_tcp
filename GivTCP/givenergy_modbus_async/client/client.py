@@ -215,7 +215,8 @@ class Client:
         self,
         timeout: int = 3,
         retries: int = 10,
-        additional: bool=True) -> None:
+        additional: bool = True,
+        lite: bool = False) -> None:
         """Detect inverter capabilities that influence how subsequent 
         requests are made."""
 
@@ -246,31 +247,37 @@ class Client:
             self.plant.isHV = True
         else:
             self.plant.isHV= False
-#            meter_list=[]
-        meter_list=[1,2,3,4,5,6,7,8]
-
-        #### Set whether a device has batteries and then count them if they are allowed ####
-        if self.plant.device_type in (Model.EMS,Model.GATEWAY, Model.HYBRID_GEN4):
-            await self.refresh_plant(True, number_batteries=0, meter_list=meter_list, bcu_list=self.plant.bcu_list, retries=retries, timeout=timeout, return_exceptions=True) #set return exceptions to true to allow meters to not be found
-        else:
-            if self.plant.device_type in (Model.AC, Model.HYBRID_GEN1):
-                self.plant.slave_address = 0x31
-            #### Determine how many BCUs and then define the battery locations to look for, then set plant.number_bcus ####
-            if self.plant.isHV:
-                await self.get_bcus()
             
-            #### Get max num of batteries for each BCU then test if they are valid ####
-            await self.refresh_plant(True, number_batteries=6, meter_list=meter_list, bcu_list=self.plant.bcu_list, retries=retries, timeout=timeout, return_exceptions=True) #set return exceptions to true to allow meters to not be found
-            self.plant.detect_batteries()
+        # Only detect meters if we do not have a lite request
+        if lite:
+            self.plant.meter_list=[]
+            self.plant.number_batteries=0
+            self.plant.bcu_list=[]
+            _logger.debug("Lite is set: Meter and battery detection skipped")
+        else:
+            meter_list=[1,2,3,4,5,6,7,8]
 
-        self.plant.detect_meters()
+            #### Set whether a device has batteries and then count them if they are allowed ####
+            if self.plant.device_type in (Model.EMS,Model.GATEWAY, Model.HYBRID_GEN4):
+                await self.refresh_plant(True, number_batteries=0, meter_list=meter_list, bcu_list=self.plant.bcu_list, retries=retries, timeout=timeout, return_exceptions=True) #set return exceptions to true to allow meters to not be found
+            else:
+                if self.plant.device_type in (Model.AC, Model.HYBRID_GEN1):
+                    self.plant.slave_address = 0x31
+                #### Determine how many BCUs and then define the battery locations to look for, then set plant.number_bcus ####
+                if self.plant.isHV:
+                    await self.get_bcus()
+            
+                #### Get max num of batteries for each BCU then test if they are valid ####
+                await self.refresh_plant(True, number_batteries=6, meter_list=meter_list, bcu_list=self.plant.bcu_list, retries=retries, timeout=timeout, return_exceptions=True) #set return exceptions to true to allow meters to not be found
+                self.plant.detect_batteries()
+
+            self.plant.detect_meters()
         
             # Use that to detect the number of batteries
-        _logger.debug("Batteries detected: %d", self.plant.number_batteries)
-        _logger.debug("Meters detected: %d", len(self.plant.meter_list))
-        _logger.debug("Slave address in use: "+ str(self.plant.slave_address))
+            _logger.debug("Batteries detected: %d", self.plant.number_batteries)
+            _logger.debug("Meters detected: %d", len(self.plant.meter_list))
+            _logger.debug("Slave address in use: "+ str(self.plant.slave_address))
 
-        #Get Meter Product Info
 
 
         # Some devices support additional registers
@@ -280,7 +287,7 @@ class Client:
         if additional:
 
             # Set additional registers based on model
-            additional_registers=Model.add_regs(self.plant.device_type.value)
+            additional_registers=Model.add_regs(self.plant.device_type.value, lite)
             possible_additional_input_registers=additional_registers[0]
             possible_additional_holding_registers=additional_registers[1]
 
