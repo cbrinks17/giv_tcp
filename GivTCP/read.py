@@ -2616,30 +2616,23 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                         return oldData
 
         ## Now smooth data
-                if lookup.smooth and not GiV_Settings.data_smoother.lower() == "none":     # apply smoothing if required
-                    if newData != oldData:  # Only if its not the same
-                        if name in outliers:    #If the last data point was skipped then keep newdata as two dodgy reads is unlikely
-                            logger.debug("Returning new "+str(name)+" data as the last read was smoothed")
-                            outliers.remove(name)
-                            return newData
+                if lookup.smooth and not GiV_Settings.data_smoother.lower() == "none":
+                    if newData != oldData:
                         if any(word in name.lower() for word in ["power","_to_"]):
                             if abs(newData-oldData)>abssmooth:                                
-                                if checkRawcache(newData,name,abssmooth): #If new data is persistently outside bounds then use new value
+                                if checkRawcache(newData,name,abssmooth):
                                     return(newData)
                                 else:
                                     logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
-                                    outliers.append(name)
                                     return (oldData)
                         else:
-                            ## Only smooth data if its not already Zero (avoid div by Zero)
                             if oldData != 0:
-                                if abs(newData-oldData) < 1: # ignore very small changes (eg. today energy stats at start of day)
+                                if abs(newData-oldData) < 1:
                                     return (newData)
                                 timeDelta = (now-then).total_seconds()
-                                dataDelta = abs(newData-oldData)/oldData    #Should it be a ratio or an abs value as low values easily meet the threshold
+                                dataDelta = abs(newData-oldData)/oldData
                                 if dataDelta > smoothRate and timeDelta < 60:
                                     logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
-                                    outliers.append(name)
                                     return (oldData)
         else:
             logger.debug("Nonetype in old or new data for "+str(name)+" so using new value")
