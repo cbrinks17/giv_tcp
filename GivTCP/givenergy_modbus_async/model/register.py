@@ -174,6 +174,7 @@ class Converter:
             "4004": 11000,
             "7001": 12000,
             "8001": 6000,
+            "8002": 3600,
             "8101": 6000,
             "8102": 8000,
             "8103": 10000,
@@ -589,7 +590,7 @@ class Converter:
                 return datetime(year + 2000, month, day, hour, min, sec)
             return datetime(2000,1,1,0,0,0)
         except:
-            _logger.error("Error processing datetime. Sending Zero Date")
+            _logger.debug("Error processing datetime. Sending Zero Date")
             return datetime(2000,1,1,0,0,0)
 
 class WorkMode(IntEnum):
@@ -722,7 +723,7 @@ class Model(StrEnum):
             '4': ([240,1000,1060,1120,1180,1240,1300,1360],[180,240,1000,1060,1120]),   #"Hybrid - 3ph"
             '5': ([2040],[2040]),   #EMS
             '6': ([1000,1060,1120,1180,1240,1300,1360],[180,240,1000,1060,1120]),   #AC - 3ph
-            '7': ([1600,1660,1720,1780,1840],[180,240,300]),   #Gateway
+            '7': ([1660,1720,1780,1840],[180,240,300]),   #Gateway
             '8': ([240],[180,240,300]),   #All in One
         }
         return regs.get(value[0])

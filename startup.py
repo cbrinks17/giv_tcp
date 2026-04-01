@@ -81,7 +81,8 @@ async def getInvDeets(HOST):
         #Stats['Generation']=gen
         Stats['Number_of_Batteries']=numbats
         Stats['IP_Address']=HOST
-        logger.info(f'Inverter {str(SN)} which is a {str(model.name.capitalize())} with {str(numbats)} batteries and {str(nummeters)} meters has been found at: {str(HOST)}')
+        logger.info(f'Inverter {str(SN)} which is a {str(model.name.capitalize())}({GEInv.device_type_code}) with {str(numbats)} batteries and {str(nummeters)} meters has been found at: {str(HOST)}')
+
         return Stats
     except Exception:
         logger.error("Gathering inverter details for " + str(HOST) + " failed. Error: "+ str((traceback.format_exc())))

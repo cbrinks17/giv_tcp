@@ -37,6 +37,7 @@ export const useTcpStore = defineStore('givtcp-form', {
       evc_import_max_current: 60
     }),
     selfrun: useSessionStorage('selfrun', {
+      auto_scan: true,
       self_run: false,
       self_run_timer: 30,
       self_run_timer_full: 120,
@@ -356,6 +357,14 @@ export const useCard = defineStore('card', {
       title: 'Self Run',
       subtitle: 'Setup the MQTT broker that stores information about your incoming inverter data',
       fields: [
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Auto Scan',
+            parent: 'selfrun',
+            key: 'auto_scan'
+          }
+        },
         {
           type: 'checkbox',
           options: {

@@ -9,7 +9,7 @@
 
 from threading import Thread, Lock
 import ipaddress
-from time import perf_counter
+from time import perf_counter, sleep
 import sys
 import socket
 
@@ -53,12 +53,19 @@ class Threader:
 
     def worker(self, thread:Thread) -> None:
         # While we are running and there are functions to call:
-        while self.running and (len(self.functions) > 0):
-            # Get a function
+        while self.running:
+            # Get a function if available; if none, exit the worker so join() can complete
             with self.functions_lock:
+                if not self.functions:
+                    break
                 function, args = self.functions.pop(0)
+
             # Call that function
-            function(*args)
+            try:
+                function(*args)
+            except Exception:
+                # Don't let one task crash the thread
+                pass
 
         # Remove the thread from the list of threads.
         # This may cause issues if the user calls `<Threader>.join()`

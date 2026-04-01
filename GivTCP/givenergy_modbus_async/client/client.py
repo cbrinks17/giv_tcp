@@ -13,6 +13,10 @@ from ..framer import (
     ClientFramer,
     Framer,
 )
+from ..pdu import (
+    ReadHoldingRegistersRequest,
+    TransparentRequest,
+)
 from ..model.plant import Plant
 from ..pdu import (
     HeartbeatRequest,
@@ -218,22 +222,34 @@ class Client:
         additional: bool=True) -> None:
         """Detect inverter capabilities that influence how subsequent 
         requests are made."""
-
+        from ..model.register import HR
         _logger.info("Detecting plant")
         from ..model.register import Model
         # Refresh the core set of registers that work across all inverters
         #await self.refresh_plant(True, timeout=timeout, retries=retries)
-        
+
         #Force 0x11 slave address only during detect
         self.plant.slave_address=0x11
         self.plant.isHV = False
-        
+
+        #Do this to get DTC so we can detect best regs upfront
+        reqs: list[TransparentRequest] = [
+            ReadHoldingRegistersRequest(
+                base_register=0, register_count=60, slave_address=self.plant.slave_address
+            )
+        ]
+        await self.execute(reqs, timeout=timeout, retries=retries, return_exceptions=False)
+        if hex(self.plant.register_caches[self.plant.slave_address][HR(0)])[2:3]=="7":
+            self.plant.additional_input_registers=[1600]        
         await self.refresh_plant(True, number_batteries=0, retries=retries, timeout=timeout)
 
         _logger.info("Plant Detected")
 
 ############ Check what other devices need 0x11 ###############
         #find model depending on device type
+
+        # Do we re request
+
         if not self.plant.inverter == None:
             self.plant.device_type=self.plant.inverter.model
             
