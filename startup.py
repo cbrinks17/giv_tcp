@@ -105,6 +105,7 @@ def createsettingsjson(inv):
         outp.write("    serial_number=\""+str(setts["serial_number_"+str(inv)])+"\"\n")
         outp.write("    inverter_type=\""+str(setts["Model_"+str(inv)])+"\"\n")
         outp.write("    Battery_Only=\""+str(setts["inverter_battery_only_"+str(inv)])+"\"\n")
+        outp.write("    lite_query=\""+str(setts["lite_query_"+str(inv)])+"\"\n")
         outp.write("    MQTT_Address=\""+str(setts["MQTT_Address"])+"\"\n")
         outp.write("    MQTT_Username=\""+str(setts["MQTT_Username"])+"\"\n")
         outp.write("    MQTT_Password=\""+str(setts["MQTT_Password"])+"\"\n")

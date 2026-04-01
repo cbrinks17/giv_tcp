@@ -15,7 +15,7 @@ GivTCP provides a wide range of inverter control settings. When using HA an MQTT
 | Battery Pause Mode | Sets the battery operation mode. One of "Disabled","PauseCharge","PauseDischarge" or "PauseBoth" | Pause Battery |
 | Battery Power Cutoff | ???? | Battery Cutoff % Limit |
 | Battery Power Reserve | Sets the minimum battery discharge SOC as a precentage. 100% = battery capacity  | Battery Reserve % Limit |
-Charge Target SOC (1-10) | Sets the target SOC when charging as a percentage. 100% = battery capacity. There are 10 slots 1-10 | AC Charge 1 Upper SOC % Limit |
+| Charge Target SOC (1-10) | Sets the target SOC when charging as a percentage. 100% = battery capacity. There are 10 slots 1-10 | AC Charge 1 Upper SOC % Limit |
 | Discharge Target (SOC 1-10) | Sets the target SOC when discharging as a percentage. Minimum = Battery Power Reserve. | AC Discharge 1 Lower SOC % Limit |
 | Eco Mode | Sets Eco mode | Enable Eco mode |
 | Enable Charge Schedule | Sets the Charging schedule state, if disabled the battery will not charge as per the schedule | xxx |
