@@ -131,7 +131,7 @@ class Converter:
         """Represent BMU capacity in kWh from Ah."""
         model=f"{model:0{4}x}"
         if model[0] in ['8']:                       #AIO
-            return round((nom_cap*317)/1000,2)
+            return round((nom_cap*307)/1000,2)
         elif model[0] in ['4','6']:                 #3PH
             return round((nom_cap*76.8)/1000,2)
         else:                                       #LV
@@ -175,6 +175,7 @@ class Converter:
             "7001": 12000,
             "8001": 6000,
             "8002": 3600,
+            "8003": 5000,
             "8101": 6000,
             "8102": 8000,
             "8103": 10000,
@@ -536,6 +537,8 @@ class Converter:
             "2201": 5400,
             "3002": 3000,
             "8001": 6000,
+            "8002": 3600,
+            "8003": 5000,
             "8102": 8000,
             "8103": 10000,
         }                   #Covers AC3, Gen4 and AIO
@@ -1174,6 +1177,8 @@ class InverterType_2:
     "4004": 11000,
     "7001": 12000,
     "8001": 6000,
+    "8002": 5000,
+    "8003": 3600,
     "8101": 6000,
     "8102": 8000,
     "8103": 10000,

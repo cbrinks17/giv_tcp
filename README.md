@@ -201,7 +201,7 @@ Some advance instructions to help you troubleshoot your battery and/or GivTCP in
 
 ### Discovery takes a very long time
 
-If GivTCP takes a very long time at startup during discovery, this might be related to your local network. The way GivTCP discovers the battery in the network is by trying all network addresses one by one. In a class C network (000.000.000.XXX; 256 hosts) this happens fairly quickly. If you have a class B network (000.000.XXX.XXX; 65.536 hosts) or if you have multiple network interfaces this discovery can take a long time.
+If GivTCP takes a very long time at startup during discovery, this might be related to your local network. The way GivTCP discovers the battery in the network is by trying all network addresses one by one. In a class C network (000.000.000.XXX; 256 hosts) this happens fairly quickly. If you have a class B network (000.000.XXX.XXX; 65,536 hosts) or if you have multiple network interfaces this discovery can take a long time.
 
 You can manually set the IP address of your battery and disable autodiscovery in the GivTCP config file, which is located in /config/GivTCP/allsettings.json
 
