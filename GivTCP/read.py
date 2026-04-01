@@ -15,6 +15,7 @@ import write
 import inspect
 import requests
 from GivLUT import GivLUT, maxvalues, InvType, GivClientAsync
+from outliers import outlierRemoval
 from entity_lut import Entity_Type
 from settings import GiV_Settings
 from os.path import exists
@@ -32,8 +33,6 @@ sys.path.append(GiV_Settings.default_path)
 
 givLUT = Entity_Type.entity_type
 logger = GivLUT.logger
-
-outliers=[]
 
 def commsFailure():
     fname="commsfailure_"+str(GiV_Settings.givtcp_instance)+".pkl"
@@ -2078,12 +2077,12 @@ def processData(plant: Plant):
             multi_output=dataCleansing(multi_output,regCacheStack[-1])
 
 ### Outlier removal for multi_output
-#        if len(regCacheStack)>100:
-#            logger.debug("Running outlier removal")
-#            multi_output,regCacheStack  = outlierRemoval(multi_output,regCacheStack)
-#            logger.debug("outlier removal Complete")
-#        else:
-#            logger.debug("outlier removal not carried out: cache too small")
+        if len(regCacheStack)>20:
+            logger.debug("Running outlier removal")
+            multi_output,regCacheStack  = outlierRemoval(multi_output,regCacheStack)
+            logger.debug("outlier removal Complete")
+        else:
+            logger.debug("outlier removal not carried out: cache too small")
 
         # run ppkwh stats on firstrun and every half hour
         if plant.number_batteries>0:    #Don't run ratecalcs if no batteries
@@ -2668,17 +2667,12 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
         ## Now smooth data
                 if lookup.smooth and not GiV_Settings.data_smoother.lower() == "none":     # apply smoothing if required
                     if newData != oldData:  # Only if its not the same
-                        if name in outliers:    #If the last data point was skipped then keep newdata as two dodgy reads is unlikely
-                            logger.debug("Returning new "+str(name)+" data as the last read was smoothed")
-                            outliers.remove(name)
-                            return newData
                         if any(word in name.lower() for word in ["power","_to_"]):
                             if abs(newData-oldData)>abssmooth:                                
                                 if checkRawcache(newData,name,abssmooth): #If new data is persistently outside bounds then use new value
                                     return(newData)
                                 else:
                                     logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
-                                    outliers.append(name)
                                     return (oldData)
                         else:
                             ## Only smooth data if its not already Zero (avoid div by Zero)
@@ -2689,7 +2683,6 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                                 dataDelta = abs(newData-oldData)/oldData    #Should it be a ratio or an abs value as low values easily meet the threshold
                                 if dataDelta > smoothRate and timeDelta < 60:
                                     logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
-                                    outliers.append(name)
                                     return (oldData)
         else:
             logger.debug("Nonetype in old or new data for "+str(name)+" so using new value")
