@@ -150,6 +150,14 @@ export const useCard = defineStore('card', {
         {
           type: 'checkbox',
           options: {
+            label: 'Inverter 1 Lite mode (no battery/meter or additional timeslot data',
+            parent: 'inverters',
+            key: 'lite_query_1'
+          }
+        },        
+        {
+          type: 'checkbox',
+          options: {
             label: 'Inverter 1 only report battery data (for use when this inverter is connected to EMS or Gateway in parallel mode)',
             parent: 'inverters',
             key: 'inverter_battery_only_1'
@@ -195,7 +203,14 @@ export const useCard = defineStore('card', {
             key: 'inverter_battery_only_2'
           }
         },
-
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 2 Lite mode (no battery/meter or additional timeslot data',
+            parent: 'inverters',
+            key: 'lite_query_2'
+          }
+        },
         {
           type: 'checkbox',
           options: {
@@ -239,6 +254,14 @@ export const useCard = defineStore('card', {
         {
           type: 'checkbox',
           options: {
+            label: 'Inverter 3 Lite mode (no battery/meter or additional timeslot data',
+            parent: 'inverters',
+            key: 'lite_query_3'
+          }
+        },
+        {
+          type: 'checkbox',
+          options: {
             label: 'Inverter 4 Enable',
             parent: 'inverters',
             key: 'inverter_enable_4'
@@ -276,7 +299,14 @@ export const useCard = defineStore('card', {
             key: 'inverter_battery_only_4'
           }
         },
-
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 4 Lite mode (no battery/meter or additional timeslot data',
+            parent: 'inverters',
+            key: 'lite_query_4'
+          }
+        },
         {
           type: 'checkbox',
           options: {
@@ -317,7 +347,14 @@ export const useCard = defineStore('card', {
             key: 'inverter_battery_only_5'
           }
         },
-
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 5 Lite mode (no battery/meter or additional timeslot data',
+            parent: 'inverters',
+            key: 'lite_query_5'
+          }
+        },
       ]
     },
     evc: {
