@@ -1,4 +1,4 @@
-name:  "GivTCP"
+name:  "GivTCP (No Outliers Code)"
 description:  "TCP Modbus connection to MQTT/JSON for Givenergy Battery/PV Invertors"
 version:  "2.4.9"
 #image: britkat/giv_tcp-ma
