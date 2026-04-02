@@ -2019,12 +2019,16 @@ def processData(plant: Plant):
 
         multi_output['Stats']=givtcpdata
         regCacheStack = GivLUT.get_regcache()
+        if regCacheStack is None:  # Transient failure - retry once
+            logger.warning("regCache read failed, retrying...")
+            sleep(1)
+            regCacheStack = GivLUT.get_regcache()
         if not regCacheStack:
             regCacheStack = []
         logger.debug("cache len= "+str(len(regCacheStack)))
 
 ### Min/Max pre-cleanse
-        if len(regCacheStack)>1:
+        if len(regCacheStack)>0:
             multi_output=dataCleansing(multi_output,regCacheStack[-1])
 
 ### Outlier removal for multi_output
@@ -2614,6 +2618,11 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                     if (oldData-newData) > 0.11:
                         logger.debug(str(name)+" has decreased so using old value")
                         return oldData
+                    if oldData > 1 and newData > oldData:
+                        dataDelta = (newData - oldData) / oldData
+                        if dataDelta > smoothRate:
+                            logger.debug(str(name)+" increased too rapidly: "+str(oldData)+"->"+str(newData)+" so using previous value")
+                            return oldData
 
         ## Now smooth data
                 if lookup.smooth and not GiV_Settings.data_smoother.lower() == "none":
