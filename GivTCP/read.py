@@ -2019,12 +2019,16 @@ def processData(plant: Plant):
 
         multi_output['Stats']=givtcpdata
         regCacheStack = GivLUT.get_regcache()
+        if regCacheStack is None:  # Transient failure - retry once
+            logger.warning("regCache read failed, retrying...")
+            time.sleep(1)
+            regCacheStack = GivLUT.get_regcache()
         if not regCacheStack:
             regCacheStack = []
         logger.debug("cache len= "+str(len(regCacheStack)))
 
 ### Min/Max pre-cleanse
-        if len(regCacheStack)>1:
+        if len(regCacheStack)>0:
             multi_output=dataCleansing(multi_output,regCacheStack[-1])
 
 ### Outlier removal for multi_output
@@ -2598,7 +2602,7 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                 then = datetime.datetime.fromisoformat(lastUpdate)
 
         ## Check Midnight Today as special case before checking for Zero
-                if now.minute == 0 and now.hour == 0 and "Today" in name:  # Treat Today stats as a special case
+                if now.hour == 0 and now.minute < 5 and "Today" in name:  # Treat Today stats as a special case - allow 5 min window for inverter clock drift
                     logger.debug("Midnight and "+str(name)+" so accepting value as is: "+str(newData))
                     return (newData)
         ## Now discard non-allowed Zero datapoints
@@ -2614,23 +2618,29 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                     if (oldData-newData) > 0.11:
                         logger.debug(str(name)+" has decreased so using old value")
                         return oldData
+                    if oldData > 1 and newData > oldData:
+                        dataDelta = (newData - oldData) / oldData
+                        if dataDelta > smoothRate:
+                            logger.debug(str(name)+" increased too rapidly: "+str(oldData)+"->"+str(newData)+" so using previous value")
+                            return oldData
 
         ## Now smooth data
-                if lookup.smooth and not GiV_Settings.data_smoother.lower() == "none":
-                    if newData != oldData:
+                if lookup.smooth and not GiV_Settings.data_smoother.lower() == "none":     # apply smoothing if required
+                    if newData != oldData:  # Only if its not the same
                         if any(word in name.lower() for word in ["power","_to_"]):
                             if abs(newData-oldData)>abssmooth:                                
-                                if checkRawcache(newData,name,abssmooth):
+                                if checkRawcache(newData,name,abssmooth): #If new data is persistently outside bounds then use new value
                                     return(newData)
                                 else:
                                     logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
                                     return (oldData)
                         else:
+                            ## Only smooth data if its not already Zero (avoid div by Zero)
                             if oldData != 0:
-                                if abs(newData-oldData) < 1:
+                                if abs(newData-oldData) < 1: # ignore very small changes (eg. today energy stats at start of day)
                                     return (newData)
                                 timeDelta = (now-then).total_seconds()
-                                dataDelta = abs(newData-oldData)/oldData
+                                dataDelta = abs(newData-oldData)/oldData    #Should it be a ratio or an abs value as low values easily meet the threshold
                                 if dataDelta > smoothRate and timeDelta < 60:
                                     logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
                                     return (oldData)
