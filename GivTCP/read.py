@@ -2070,7 +2070,7 @@ def processData(plant: Plant):
         regCacheStack = GivLUT.get_regcache()
         if regCacheStack is None:  # Transient failure - retry once
             logger.warning("regCache read failed, retrying...")
-            sleep(1)
+            time.sleep(1)
             regCacheStack = GivLUT.get_regcache()
         if not regCacheStack:
             regCacheStack = []
@@ -2651,7 +2651,7 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                 then = datetime.datetime.fromisoformat(lastUpdate)
 
         ## Check Midnight Today as special case before checking for Zero
-                if now.minute == 0 and now.hour == 0 and "Today" in name:  # Treat Today stats as a special case
+                if now.hour == 0 and now.minute < 5 and "Today" in name:  # Treat Today stats as a special case - allow 5 min window for inverter clock drift
                     logger.debug("Midnight and "+str(name)+" so accepting value as is: "+str(newData))
                     return (newData)
         ## Now discard non-allowed Zero datapoints
