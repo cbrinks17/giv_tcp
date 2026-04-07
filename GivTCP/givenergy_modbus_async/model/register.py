@@ -131,7 +131,7 @@ class Converter:
         """Represent BMU capacity in kWh from Ah."""
         model=f"{model:0{4}x}"
         if model[0] in ['8']:                       #AIO
-            return round((nom_cap*317)/1000,2)
+            return round((nom_cap*307)/1000,2)
         elif model[0] in ['4','6']:                 #3PH
             return round((nom_cap*76.8)/1000,2)
         else:                                       #LV
@@ -174,6 +174,8 @@ class Converter:
             "4004": 11000,
             "7001": 12000,
             "8001": 6000,
+            "8002": 3600,
+            "8003": 5000,
             "8101": 6000,
             "8102": 8000,
             "8103": 10000,
@@ -535,6 +537,8 @@ class Converter:
             "2201": 5400,
             "3002": 3000,
             "8001": 6000,
+            "8002": 3600,
+            "8003": 5000,
             "8102": 8000,
             "8103": 10000,
         }                   #Covers AC3, Gen4 and AIO
@@ -589,7 +593,7 @@ class Converter:
                 return datetime(year + 2000, month, day, hour, min, sec)
             return datetime(2000,1,1,0,0,0)
         except:
-            _logger.error("Error processing datetime. Sending Zero Date")
+            _logger.debug("Error processing datetime. Sending Zero Date")
             return datetime(2000,1,1,0,0,0)
 
 class WorkMode(IntEnum):
@@ -684,7 +688,7 @@ class Model(StrEnum):
         return cls(value[:2])
         
     @classmethod
-    def core_regs(cls, value):
+    def core_regs(cls, value, lite:bool=False):
 ########## Currently unused  #############
         """Return core registers for each model to be pulled in a "partial" refresh. (IR,HR)"""
 
@@ -704,28 +708,53 @@ class Model(StrEnum):
         regs={
             '2': ([0, 60, 120, 180],[0, 60, 120, 120]),    #Hybrid
             '3': ([0, 60, 120, 180],[0, 60, 120, 120]),    #AC
-            '4': ([0, 60, 120, 180, 240,1000,1060,1120,1180,1240,1300,1360],[180,240,1000,1060,1120]),   #"Hybrid - 3ph"
+            '4': ([0, 60, 120, 180, 240, 1000, 1060, 1120, 1180, 1240, 1300, 1360],[180, 240, 1000, 1060, 1120]),   #"Hybrid - 3ph"
             '5': ([2040],[2040]),   #EMS
-            '6': ([0, 60, 120, 180, 240,1000,1060,1120,1180,1240,1300,1360],[180,240,1000,1060,1120]),   #AC - 3ph
-            '7': ([0, 60, 120, 180,1600,1660,1720,1780,1840],[0, 60, 120, 120,180,240,300]),   #Gateway
+            '6': ([0, 60, 120, 180, 240, 1000, 1060, 1120, 1180, 1240, 1300, 1360],[180, 240, 1000, 1060, 1120]),   #AC - 3ph
+            '7': ([0, 60, 120, 180, 1600, 1660, 1720, 1780, 1840],[0, 60, 120, 120, 180, 240, 300]),   #Gateway
             '8': ([0, 60, 120, 180, 240],[0, 60, 120, 120, 180, 240, 300]),   #All in One and Gen 4 and Hybrid HV
         }
-        return regs.get(value[0])
+        regs_lite={
+            '2': ([0, 60, 120, 180],[0, 60, 120, 120]),    #Hybrid
+            '3': ([0, 60, 120, 180],[0, 60, 120, 120]),    #AC
+            '4': ([0, 60, 120, 180, 240, 1000, 1060, 1120, 1180, 1240, 1300, 1360],[180, 1000, 1060, 1120]),   #"Hybrid - 3ph"
+            '5': ([2040],[2040]),   #EMS
+            '6': ([0, 60, 120, 180, 240, 1000, 1060, 1120, 1180, 1240, 1300, 1360],[180, 1000, 1060, 1120]),   #AC - 3ph
+            '7': ([0, 60, 120, 180, 1600, 1660, 1720, 1780, 1840],[0, 60, 120, 120, 180, 300]),   #Gateway
+            '8': ([0, 60, 120, 180, 240],[0, 60, 120, 120, 180, 300]),   #All in One and Gen 4 and Hybrid HV
+        }
+
+        if lite:
+            return regs_lite.get(value[0])
+        else:
+            return regs.get(value[0])
 
     @classmethod
-    def add_regs(cls, value):
+    def add_regs(cls, value, lite:bool=False):
 ############# THS NEEDS RESTRUCTURING TO ALLOW INDIVIDUAL "CORE" REGS TO BE GOT EVERYTIME (eg GATEWAY, EMS AND 3PH) #############
         """Return possible additional registers to be pulled in a "complete" refresh.(IR,HR)"""
         regs={
-            '2': ([240],[180,240,300]),    #Hybrid
-            '3': ([],[180,240,300]),    #AC
-            '4': ([240,1000,1060,1120,1180,1240,1300,1360],[180,240,1000,1060,1120]),   #"Hybrid - 3ph"
+            '2': ([240],[180, 240, 300]),    #Hybrid
+            '3': ([],[180, 240, 300]),    #AC
+            '4': ([240, 1000, 1060, 1120, 1180, 1240, 1300, 1360],[180, 240, 1000, 1060, 1120]),   #"Hybrid - 3ph"
             '5': ([2040],[2040]),   #EMS
-            '6': ([1000,1060,1120,1180,1240,1300,1360],[180,240,1000,1060,1120]),   #AC - 3ph
-            '7': ([1600,1660,1720,1780,1840],[180,240,300]),   #Gateway
-            '8': ([240],[180,240,300]),   #All in One
+            '6': ([1000, 1060, 1120, 1180, 1240, 1300, 1360],[180, 240, 1000, 1060, 1120]),   #AC - 3ph
+            '7': ([1600, 1660, 1720, 1780, 1840],[180, 240, 300]),   #Gateway
+            '8': ([240],[180, 240, 300]),   #All in One
         }
-        return regs.get(value[0])
+        regs_lite={
+            '2': ([240],[180, 300]),    #Hybrid
+            '3': ([],[180, 300]),    #AC
+            '4': ([240,1000,1060,1120,1180,1240,1300,1360],[180, 1000, 1060, 1120]),   #"Hybrid - 3ph"
+            '5': ([2040],[2040]),   #EMS
+            '6': ([1000, 1060, 1120, 1180, 1240, 1300, 1360],[180, 1000, 1060, 1120]),   #AC - 3ph
+            '7': ([1600, 1660, 1720, 1780, 1840],[180, 300]),   #Gateway
+            '8': ([240],[180, 300]),   #All in One
+        }
+        if lite:
+            return regs_lite.get(value[0])
+        else:
+            return regs.get(value[0])
 
 
 class Generation(StrEnum):
@@ -1148,6 +1177,8 @@ class InverterType_2:
     "4004": 11000,
     "7001": 12000,
     "8001": 6000,
+    "8002": 5000,
+    "8003": 3600,
     "8101": 6000,
     "8102": 8000,
     "8103": 10000,

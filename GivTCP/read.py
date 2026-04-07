@@ -15,6 +15,7 @@ import write
 import inspect
 import requests
 from GivLUT import GivLUT, maxvalues, InvType, GivClientAsync
+from outliers import outlierRemoval
 from entity_lut import Entity_Type
 from settings import GiV_Settings
 from os.path import exists
@@ -23,6 +24,7 @@ from datetime import timedelta
 import asyncio
 from typing import Callable, Optional
 from mqtt import GivMQTT
+import copy
 
 logging.getLogger("givenergy_modbus_async").setLevel(logging.ERROR) 
 logging.getLogger("rq.worker").setLevel(logging.CRITICAL)
@@ -31,8 +33,6 @@ sys.path.append(GiV_Settings.default_path)
 
 givLUT = Entity_Type.entity_type
 logger = GivLUT.logger
-
-outliers=[]
 
 def commsFailure():
     fname="commsfailure_"+str(GiV_Settings.givtcp_instance)+".pkl"
@@ -79,7 +79,7 @@ async def watch_plant(
             client = await GivClientAsync.get_connection(cold_start=True)
 ######### Is there a way to just refresh plant here rather than detect again? ##########
             logger.critical("Detecting inverter characteristics...")
-            await client.detect_plant()
+            await client.detect_plant(lite = GiV_Settings.lite_query)
             await client.refresh_plant(True, number_batteries=client.plant.number_batteries,meter_list=client.plant.meter_list)
             #await client.close()
             if client.plant.device_type==Model.GATEWAY:
@@ -193,8 +193,8 @@ async def watch_plant(
                 # Run resetTodayStats() once when the date changes at midnight.
                 # Use the shared marker on GivLUT so other modules reference the
                 # same state.
-                if now.hour == 0 and now.minute == 0:
-                    resetTodayStats()
+#                if now.hour == 0 and now.minute == 0:
+#                    resetTodayStats()
                 if timesincelast.total_seconds() < refresh_period:
                     await asyncio.sleep(0.5)
                     #if refresh period hasn't expired then just keep looping back up to write check
@@ -284,7 +284,7 @@ def getInvModel(plant: Plant):
     inverterModel.model=GEInv.model
     #inverterModel.generation=GEInv.generation
     inverterModel.phase=GEInv.num_phases
-    inverterModel.invmaxrate=GEInv.inverter_max_power
+    inverterModel.invmaxrate=GEInv.inverter_max_power_new
     inverterModel.batmaxrate=GEInv.battery_max_power
     inverterModel.batterycapacity=GEInv.battery_nominal_capacity        #for HV this is reported Ah times nom voltage (100%)
     # Calc max charge rate
@@ -511,7 +511,7 @@ def getTimeslots(plant: Plant, multi_output_old=None):
     timeslots['Charge_end_time_slot_1'] = validateTimeslot(GEInv.charge_slot_1.end,"Charge_end_time_slot_1",multi_output_old)
 
     try:
-        if GEInv.model in [Model.ALL_IN_ONE, Model.AC_3PH, Model.HYBRID_3PH, Model.GATEWAY, Model.HYBRID_GEN4] or (GEInv.model == Model.HYBRID_GEN3 and int(GEInv.arm_firmware_version)>302):   #10 slots don't apply to AC/Hybrid except new fw on Gen 3
+        if GEInv.model in [Model.ALL_IN_ONE, Model.AC_3PH, Model.HYBRID_3PH, Model.GATEWAY, Model.HYBRID_GEN4, Model.HYBRID_HV_GEN3] or (GEInv.model == Model.HYBRID_GEN3 and int(GEInv.arm_firmware_version)>302):   #10 slots don't apply to AC/Hybrid except new fw on Gen 3
             timeslots['Charge_start_time_slot_2'] = validateTimeslot(GEInv.charge_slot_2.start,"Charge_start_time_slot_2",multi_output_old)
             timeslots['Charge_end_time_slot_2'] = validateTimeslot(GEInv.charge_slot_2.end,"Charge_end_time_slot_2",multi_output_old)
             timeslots['Charge_start_time_slot_3'] = validateTimeslot(GEInv.charge_slot_3.start,"Charge_start_time_slot_3",multi_output_old)
@@ -924,7 +924,10 @@ def processPVInfo(plant: Plant):
         ######## Get Meter Details ########
 
         meters={}
-        meters.update(getMeters(plant))
+        if Giv_Settings.lite_query:
+            logger.debug("Lite query set, no meter stats")
+        else:
+            meters.update(getMeters(plant))
 
         ######## Get Battery Details ########
 
@@ -965,7 +968,6 @@ def processInverterInfo(plant: Plant):
         GEBat=plant.batteries
         isHV=plant.isHV
         inverterModel=getInvModel(plant)
-
         
         # Grab previous data from Pickle and use it validate any outrageous changes
         regCacheStack = GivLUT.get_regcache()
@@ -1058,8 +1060,31 @@ def processInverterInfo(plant: Plant):
                         (energy_today_output['Export_Energy_Today_kWh']-energy_today_output['Import_Energy_Today_kWh'])+energy_today_output['PV_Energy_Today_kWh'], 2))
             
         now=datetime.datetime.now(tz=GivLUT.timezone)
+        # Robust once-per-day midnight handling
+        try:
+            last_reset = GivLUT._last_midnight_reset
+        except Exception:
+            last_reset = None
+
+        # If this is the first read in the midnight minute, run the reset and mark it
+        if now.hour == 0 and now.minute == 0 and last_reset != now.date():
+            try:
+                resetTodayStats()
+            except Exception:
+                logger.exception("Error while running resetTodayStats")
+            try:
+                GivLUT._last_midnight_reset = now.date()
+            except Exception:
+                pass
+
         if multi_output_old:
-            
+            # If we just reset, treat previous Today values as zero to avoid restoring yesterday's numbers
+            if now.hour == 0 and now.minute == 0 and getattr(GivLUT, '_last_midnight_reset', None) == now.date():
+                multi_output_old = copy.deepcopy(multi_output_old)
+                if "Energy" in multi_output_old and "Today" in multi_output_old["Energy"]:
+                    for k in multi_output_old["Energy"]["Today"]:
+                        multi_output_old["Energy"]["Today"][k] = 0
+
             if today_self < multi_output_old["Energy"]["Today"]['Self_Consumption_Energy_Today_kWh'] and not (now.hour==0 and now.minute==0):       #Stop any rounding calculation from making load reduce in Today stats
                 energy_today_output['Self_Consumption_Energy_Today_kWh']=multi_output_old["Energy"]["Today"]['Self_Consumption_Energy_Today_kWh']
             else:
@@ -1307,18 +1332,26 @@ def processInverterInfo(plant: Plant):
         ######## Get Meter Details ########
 
         meters={}
-        meters.update(getMeters(plant))
+        if GiV_Settings.lite_query:
+            logger.debug("Lite query: No meter stats")
+        else:
+            meters.update(getMeters(plant))
 
         ######## Get Battery Details ########
 
         batteries2 = {}
-        batteries2.update(getBatteries(plant,multi_output_old))
-        if isHV:
-            # Calc HV stack capacity as function of stacks
-            cap=0
-            for stack in batteries2:
-                cap=cap+batteries2[stack]['Stack_Design_Capacity']                  #Ah x nom voltage @ 90%
-            inverter['Battery_Capacity_kWh_calc'] = cap
+        if GiV_Settings.lite_query:
+            logger.debug("Lite query: No battery stats")
+            if isHV:
+                inverter['Battery_Capacity_kWh_calc'] = 0
+        else:
+            batteries2.update(getBatteries(plant,multi_output_old))
+            if isHV:
+                # Calc HV stack capacity as function of stacks
+                cap=0
+                for stack in batteries2:
+                    cap=cap+batteries2[stack]['Stack_Design_Capacity']                  #Ah x nom voltage @ 90%
+                inverter['Battery_Capacity_kWh_calc'] = cap
 
             ######## Create multioutput and publish #########
         energy = {}
@@ -1680,10 +1713,7 @@ def processGatewayInfo(plant: Plant):
             inv1['AC_Discharge_Energy_Total_kWh']=round(GEInv.e_aio1_discharge_total/1000,2)
             inv1['SOC']=GEInv.aio1_soc
             inv1['Invertor_Power']=-GEInv.p_aio1_inverter           #invert to get negative for export
-            if swv>9:
-                inv1['AIO_1_Serial_Number']=GEInv.aio1_serial_number_new
-            else:
-                inv1['AIO_1_Serial_Number']=GEInv.aio1_serial_number
+            inv1['AIO_1_Serial_Number']=GEInv.aio1_serial_number
             #inverters[GEInv.aio1_serial_number]=inv1
             inverters["AIO_1"]=inv1
         if GEInv.e_aio2_charge_today:
@@ -1694,10 +1724,7 @@ def processGatewayInfo(plant: Plant):
             inv2['AC_Discharge_Energy_Total_kWh']=round(GEInv.e_aio2_discharge_total/1000,2)
             inv2['SOC']=GEInv.aio2_soc
             inv2['Invertor_Power']=-GEInv.p_aio2_inverter           #invert to get negative for export
-            if swv>9:
-                inv2['AIO_2_Serial_Number']=GEInv.aio2_serial_number_new
-            else:
-                inv2['AIO_2_Serial_Number']=GEInv.aio2_serial_number
+            inv2['AIO_2_Serial_Number']=GEInv.aio2_serial_number
             #inverters[GEInv.aio2_serial_number]=inv2
             inverters["AIO_2"]=inv2
         if GEInv.e_aio3_charge_today:
@@ -1708,10 +1735,7 @@ def processGatewayInfo(plant: Plant):
             inv3['AC_Discharge_Energy_Total_kWh']=round(GEInv.e_aio3_discharge_total/1000,2)
             inv3['SOC']=GEInv.aio3_soc
             inv3['Invertor_Power']=-GEInv.p_aio3_inverter           #invert to get negative for export
-            if swv>9:
-                inv3['AIO_3_Serial_Number']=GEInv.aio3_serial_number_new
-            else:
-                inv3['AIO_3_Serial_Number']=GEInv.aio3_serial_number
+            inv3['AIO_3_Serial_Number']=GEInv.aio3_serial_number
             #inverters[GEInv.aio3_serial_number]=inv3
             inverters["AIO_3"]=inv3
         
@@ -1740,7 +1764,10 @@ def processGatewayInfo(plant: Plant):
         ######## Get Meter Details ########
 
         meters={}
-        meters.update(getMeters(plant))
+        if GiV_Settings.lite_query:
+            logger.debug("Lite query: No meter stats")
+        else:
+            meters.update(getMeters(plant))
 
         if GiV_Settings.Print_Raw_Registers:
             multi_output['raw'] = getRaw(plant)
@@ -1816,6 +1843,21 @@ def processThreePhaseInfo(plant: Plant):
         energy_today_output['Export_Energy_Today_kWh']=GEInv.e_export_today
         energy_today_output['Battery_Discharge_Energy_Today_kWh']=GEInv.e_battery_discharge_today
         energy_today_output['Battery_Charge_Energy_Today_kWh']=GEInv.e_battery_charge_today
+        # midnight guard: ensure we run reset once and avoid restoring yesterday's Today numbers
+        now = datetime.datetime.now(tz=GivLUT.timezone)
+        try:
+            last_reset = GivLUT._last_midnight_reset
+        except Exception:
+            last_reset = None
+        if now.hour == 0 and now.minute == 0 and last_reset != now.date():
+            try:
+                resetTodayStats()
+            except Exception:
+                logger.exception("Error while running resetTodayStats")
+            try:
+                GivLUT._last_midnight_reset = now.date()
+            except Exception:
+                pass
         energy_today_output['Load_Energy_Today_kWh']=GEInv.e_load_today
         energy_today_output['Export2_Energy_Today_kWh']=GEInv.e_export2_today
         energy_today_output['PV_Energy_Today_kWh']=GEInv.e_pv_today
@@ -1879,14 +1921,17 @@ def processThreePhaseInfo(plant: Plant):
         ######## Get Battery Details ########
 
         batteries2 = {}
-        batteries2=getBatteries(plant,multi_output_old)
+        if GiV_Settings.lite_query:
+            power_output['SOC_kWh'] = 0
+        else:
+            batteries2=getBatteries(plant,multi_output_old)
 
-        sockwh=0
-        count=0
-        for stack in batteries2:
-            sockwh=sockwh+batteries2[stack]['Stack_SOC_kWh']
-            count+=1
-        power_output['SOC_kWh'] = sockwh/count                                         # Average SOC of all stacks...
+            sockwh=0
+            count=0
+            for stack in batteries2:
+                sockwh=sockwh+batteries2[stack]['Stack_SOC_kWh']
+                count+=1
+            power_output['SOC_kWh'] = sockwh/count                                         # Average SOC of all stacks...
 
         inverter['status']=GEInv.status.name.capitalize()
         inverter['System_Mode']=GEInv.system_mode.name.capitalize()
@@ -1900,8 +1945,9 @@ def processThreePhaseInfo(plant: Plant):
 
     # Calc HV stack capacity as function of stacks
         cap=0
-        for stack in batteries2:
-            cap=cap+batteries2[stack]['Stack_Design_Capacity']
+        if not GiV_Settings.lite_query:
+            for stack in batteries2:
+                cap=cap+batteries2[stack]['Stack_Design_Capacity']
         inverter['Battery_Capacity_kWh'] = cap
 
         inverter['Inverter_Temperature']=GEInv.t_inverter
@@ -1943,7 +1989,10 @@ def processThreePhaseInfo(plant: Plant):
         ######## Get Meter Details ########
 
         meters={}
-        meters.update(getMeters(plant))
+        if GiV_Settings.lite_query:
+            logger.debug("Lite query: No meter stats")
+        else:
+            meters.update(getMeters(plant))
 
         timeslots={}
         logger.debug("Getting TimeSlot data")
@@ -2032,12 +2081,12 @@ def processData(plant: Plant):
             multi_output=dataCleansing(multi_output,regCacheStack[-1])
 
 ### Outlier removal for multi_output
-#        if len(regCacheStack)>100:
-#            logger.debug("Running outlier removal")
-#            multi_output,regCacheStack  = outlierRemoval(multi_output,regCacheStack)
-#            logger.debug("outlier removal Complete")
-#        else:
-#            logger.debug("outlier removal not carried out: cache too small")
+        if len(regCacheStack)>20:
+            logger.debug("Running outlier removal")
+            multi_output,regCacheStack  = outlierRemoval(multi_output,regCacheStack)
+            logger.debug("outlier removal Complete")
+        else:
+            logger.debug("outlier removal not carried out: cache too small")
 
         # run ppkwh stats on firstrun and every half hour
         if plant.number_batteries>0:    #Don't run ratecalcs if no batteries

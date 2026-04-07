@@ -81,7 +81,8 @@ async def getInvDeets(HOST):
         #Stats['Generation']=gen
         Stats['Number_of_Batteries']=numbats
         Stats['IP_Address']=HOST
-        logger.info(f'Inverter {str(SN)} which is a {str(model.name.capitalize())} with {str(numbats)} batteries and {str(nummeters)} meters has been found at: {str(HOST)}')
+        logger.info(f'Inverter {str(SN)} which is a {str(model.name.capitalize())}({GEInv.device_type_code}) with {str(numbats)} batteries and {str(nummeters)} meters has been found at: {str(HOST)}')
+
         return Stats
     except Exception:
         logger.error("Gathering inverter details for " + str(HOST) + " failed. Error: "+ str((traceback.format_exc())))
@@ -104,7 +105,8 @@ def createsettingsjson(inv):
         outp.write("    invertorIP=\""+str(setts["invertorIP_"+str(inv)])+"\"\n")
         outp.write("    serial_number=\""+str(setts["serial_number_"+str(inv)])+"\"\n")
         outp.write("    inverter_type=\""+str(setts["Model_"+str(inv)])+"\"\n")
-        outp.write("    Battery_Only=\""+str(setts["inverter_battery_only_"+str(inv)])+"\"\n")
+        outp.write("    Battery_Only="+str(setts["inverter_battery_only_"+str(inv)]).capitalize()+"\n")
+        outp.write("    lite_query="+str(setts["lite_query_"+str(inv)]).capitalize()+"\n")
         outp.write("    MQTT_Address=\""+str(setts["MQTT_Address"])+"\"\n")
         outp.write("    MQTT_Username=\""+str(setts["MQTT_Username"])+"\"\n")
         outp.write("    MQTT_Password=\""+str(setts["MQTT_Password"])+"\"\n")

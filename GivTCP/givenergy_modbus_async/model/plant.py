@@ -5,7 +5,7 @@ from .battery import Battery
 from .hvbcu import BCU
 from .hvbmu import BMU
 from .ems import EMS
-from .gateway import Gateway
+from .gateway import Gateway, Gateway2
 from .threephase import ThreePhaseInverter
 from .meter import Meter, MeterProduct
 from .inverter import Inverter
@@ -156,9 +156,14 @@ class Plant:
     @property
     def gateway(self) -> Gateway:
         """Return Gateway model for the Plant."""
+        #Get f/w version
+        sn=int(str(self.register_caches[self.slave_address][IR(1603)].to_bytes(2)[0])+str(self.register_caches[self.slave_address][IR(1603)].to_bytes(2)[1]))
+        #sn=self.register_caches[self.slave_address][IR(1603)]
         if hex(self.register_caches[self.slave_address][HR(0)])[2:3]=="7":
-            return Gateway(self.register_caches[self.slave_address])
-
+            if int(sn)>=10:
+                return Gateway2(self.register_caches[self.slave_address])
+            else:
+                return Gateway(self.register_caches[self.slave_address])
     @property
     def HVStack(self) -> list:
         stacks=[]

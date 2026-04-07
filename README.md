@@ -193,3 +193,122 @@ This will cap the maximum energy delivered to the vehicle in a single charge ses
 #### Import Cap
 
 This will monitor the Grid current from the first GivTCP inverter and if it is within 5% of the Import Cap setting it will reduce EVC Charge current to stay 10% under the import Cap. Setting this to 0A disables this setting.
+
+
+## Advanced
+
+Some advance instructions to help you troubleshoot your battery and/or GivTCP installation.
+
+### Discovery takes a very long time
+
+If GivTCP takes a very long time at startup during discovery, this might be related to your local network. The way GivTCP discovers the battery in the network is by trying all network addresses one by one. In a class C network (000.000.000.XXX; 256 hosts) this happens fairly quickly. If you have a class B network (000.000.XXX.XXX; 65,536 hosts) or if you have multiple network interfaces this discovery can take a long time.
+
+You can manually set the IP address of your battery and disable autodiscovery in the GivTCP config file, which is located in /config/GivTCP/allsettings.json
+
+Edit this file and make sure the IP address and serial of your inverter/EVC is set and disable auto discovery. This will speedup starting of GivTCP.
+
+Example:
+```json
+{
+   ...
+   "inverter_enable_1": true,
+   "invertorIP_1": "192.168.34.35",
+   "serial_number_1": "TC12345678",
+   "inverterName_1": "GivTCP",
+   "lite_query_1": false,
+   ...
+   "auto_scan": false,
+   ...
+}
+```
+
+### Many timeouts or even BCM errors
+
+If you experience many GivTCP timeouts (can be seen in the addon log, or by large spikes in the "time since last update" stats entity, you inverter is probably overloaded. This has been observed in 3 phase hybrid inverters with a full load (6) batteries. This case the load on the inverter must be reduced. 
+
+There are several ways to do this.
+
+#### Longer query interval
+
+Set the query interval to 60s or longer. You can do this by modifying the self run parameters in the /config/GivTCP/allsettings.json file. There are two of them, a short period for fetching power stats and a longer period where the energy stats are fetched. Make sure the longer period is a multiple of the shorter period.
+
+Example:
+```json
+{
+   ...
+   "inverter_enable_1": true,
+   "invertorIP_1": "192.168.34.35",
+   "serial_number_1": "TC12345678",
+   "inverterName_1": "GivTCP",
+   "lite_query_1": false,
+   ...
+   "self_run_timer": 90,
+   "self_run_timer_full": 270,
+   ...
+}
+```
+
+#### Enable lite query mode
+
+When you dont use the battery charging and discharging slots (you can do this in Home Assistant automations as well), are not using the battery and meter statistics, you can enable lite mode.
+
+Lite mode does fetch the battery SOC and the generic power and energy stats, so you can see what your battery is doing currently and how much energy went through it.
+
+Stats left out in lite mode:
+1. Meter details, MQTT devices for additional meter details are not created. Meter registered in other MQTT devices are still working (Energy and Power device)
+2. BCU and individual battery statistics. None of the MQTT battery devices are created.
+3. Charging slots. GivTCP registers charging slots in two locations. Older devices have only two slots, newer have more. The data block containing the newer additional charging slots is not fetched. You can only control two slots at most.
+
+Example:
+```json
+{
+   ...
+   "inverter_enable_1": true,
+   "invertorIP_1": "192.168.34.35",
+   "serial_number_1": "TC12345678",
+   "inverterName_1": "GivTCP",
+   "lite_query_1": true,
+   ...
+}
+```
+
+#### Stop GivTCP temporarily to give the inverter time to catch up
+
+When the inverter misses several update cycles, this is a signal that the inverter is overloaded. In most cases it will continue eventually, but there is a cascading effect in the inverter software where one timeout causes another etc. This could end up in BCM communication problems and the inverter stops working.
+
+To alleviate the situation you can stop GivTCP temporarily using a Home Assistant automation.
+
+Example:
+```yaml
+alias: Inverter timout response
+description: "Stop GivTCP temporarily to give the inverter time to catch up"
+triggers:
+  - trigger: state
+    entity_id:
+      - sensor.givtcp_[yourserial]_last_update_time
+    for:
+      hours: 0
+      minutes: 3
+      seconds: 30
+conditions: []
+actions:
+  - action: hassio.addon_stop
+    metadata: {}
+    data:
+      addon: givtcp-dev
+  - delay:
+      hours: 0
+      minutes: 7
+      seconds: 0
+      milliseconds: 0
+  - action: hassio.addon_start
+    metadata: {}
+    data:
+      addon: givtcp-dev
+mode: single
+```
+
+If you want to use this automation, make sure to enter your own "last_update_time" entity and addon name. Best way to create this automation is in the visual editor of home assistant.
+    
+
+

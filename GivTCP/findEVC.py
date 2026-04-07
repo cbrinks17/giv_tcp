@@ -55,12 +55,20 @@ class Threader:
 
     def worker(self, thread:Thread) -> None:
         # While we are running and there are functions to call:
-        while self.running and (len(self.functions) > 0):
-            # Get a function
-            with self.functions_lock:
-                function, args = self.functions.pop(0)
+        while self.running:
+            # Get a function if available; if none, exit the worker so join() can complete
+            try:
+                with self.functions_lock:
+                    if not self.functions:
+                        break
+                    function, args = self.functions.pop(0)
+            except IndexError:
+                break
             # Call that function
-            function(*args)
+            try:
+                function(*args)
+            except Exception:
+                logger.exception("Exception in threaded function")
 
         # Remove the thread from the list of threads.
         # This may cause issues if the user calls `<Threader>.join()`
@@ -95,7 +103,8 @@ def findEVC(subnet):
     return(invlist)
 
 def start():
-    findEVC("192.168.2.83/24")
+    result=findEVC("192.168.3.83/24")
+    print("EVC List: "+str(result))
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:

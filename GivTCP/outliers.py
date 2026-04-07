@@ -101,7 +101,11 @@ def outlierRemoval(latest_data,CacheStack):
         if isinstance(test,(int, float)) and not isinstance(test,bool):
             df = pd.DataFrame(flatstack[item])
             clean,outliercount=impute_outliers_IQR(df, item,outliercount)
-            newdf=pd.DataFrame(clean,dtype=float).interpolate(method='linear',limit_direction='both')
+            newdf=pd.DataFrame(clean,dtype=float).interpolate(method='linear',limit_direction='both', limit=10)
+            # Fill any remaining NaNs with forward fill to avoid stuck values
+            newdf = newdf.fillna(method='ffill')
+            # If still NaNs at the beginning, backward fill
+            newdf = newdf.fillna(method='bfill')
 #            newnewdf=outlier_smoother(df)
             cleanFlatStack[item]=newdf.to_dict(orient='list')[0]
         else:

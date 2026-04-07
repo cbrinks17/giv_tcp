@@ -83,7 +83,7 @@ class ReadRegistersRequest(ReadRegistersMessage, TransparentRequest, ABC):
         self._ensure_registers_spec_correct()
 
         if self.register_count != 1 and self.base_register % 60 != 0:
-            _logger.warning(
+            _logger.info(
                 f"Base register {self.base_register} not aligned on 60-byte boundary"
             )
         if self.register_count <= 0 or 60 < self.register_count:

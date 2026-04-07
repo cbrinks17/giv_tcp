@@ -9,26 +9,31 @@ export const useTcpStore = defineStore('givtcp-form', {
       serial_number_1: "",
       inverterName_1: "",
       inverter_battery_only_1: false,
+      lite_query_1: false,
       inverter_enable_2: false,
       invertorIP_2: "",
       serial_number_2: "",
       inverterName_2: "",
       inverter_battery_only_2: false,
+      lite_query_2: false,
       inverter_enable_3: false,
       invertorIP_3: "",
       serial_number_3: "",
       inverterName_3: "",
       inverter_battery_only_3: false,
+      lite_query_3: false,
       inverter_enable_4: false,
       invertorIP_4: "",
       serial_number_4: "",
       inverterName_4: "",
       inverter_battery_only_4: false,
+      lite_query_4: false,
       inverter_enable_5: false,
       invertorIP_5: "",
       serial_number_5: "",
       inverterName_5: "",
       inverter_battery_only_5: false,
+      lite_query_5: false,
     }),
     evc: useSessionStorage('evc', {
       evc_enable: false,
@@ -37,6 +42,7 @@ export const useTcpStore = defineStore('givtcp-form', {
       evc_import_max_current: 60
     }),
     selfrun: useSessionStorage('selfrun', {
+      auto_scan: true,
       self_run: false,
       self_run_timer: 30,
       self_run_timer_full: 120,
@@ -144,6 +150,14 @@ export const useCard = defineStore('card', {
         {
           type: 'checkbox',
           options: {
+            label: 'Inverter 1 Lite mode (no battery/meter or additional timeslot data',
+            parent: 'inverters',
+            key: 'lite_query_1'
+          }
+        },        
+        {
+          type: 'checkbox',
+          options: {
             label: 'Inverter 1 only report battery data (for use when this inverter is connected to EMS or Gateway in parallel mode)',
             parent: 'inverters',
             key: 'inverter_battery_only_1'
@@ -189,7 +203,14 @@ export const useCard = defineStore('card', {
             key: 'inverter_battery_only_2'
           }
         },
-
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 2 Lite mode (no battery/meter or additional timeslot data',
+            parent: 'inverters',
+            key: 'lite_query_2'
+          }
+        },
         {
           type: 'checkbox',
           options: {
@@ -233,6 +254,14 @@ export const useCard = defineStore('card', {
         {
           type: 'checkbox',
           options: {
+            label: 'Inverter 3 Lite mode (no battery/meter or additional timeslot data',
+            parent: 'inverters',
+            key: 'lite_query_3'
+          }
+        },
+        {
+          type: 'checkbox',
+          options: {
             label: 'Inverter 4 Enable',
             parent: 'inverters',
             key: 'inverter_enable_4'
@@ -270,7 +299,14 @@ export const useCard = defineStore('card', {
             key: 'inverter_battery_only_4'
           }
         },
-
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 4 Lite mode (no battery/meter or additional timeslot data',
+            parent: 'inverters',
+            key: 'lite_query_4'
+          }
+        },
         {
           type: 'checkbox',
           options: {
@@ -311,7 +347,14 @@ export const useCard = defineStore('card', {
             key: 'inverter_battery_only_5'
           }
         },
-
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 5 Lite mode (no battery/meter or additional timeslot data',
+            parent: 'inverters',
+            key: 'lite_query_5'
+          }
+        },
       ]
     },
     evc: {
@@ -356,6 +399,14 @@ export const useCard = defineStore('card', {
       title: 'Self Run',
       subtitle: 'Setup the MQTT broker that stores information about your incoming inverter data',
       fields: [
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Auto Scan',
+            parent: 'selfrun',
+            key: 'auto_scan'
+          }
+        },
         {
           type: 'checkbox',
           options: {
