@@ -16,3 +16,4 @@ async_timeout
 vite
 tzdata
 pandas
+numpy
