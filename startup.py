@@ -353,6 +353,7 @@ if isAddon:
         headers={'Content-Type':'application/json',
                 'Authorization': 'Bearer {}'.format(access_token)})
     mqttDetails=result.json()
+    logger.debug("MQTT Service details found: "+str(mqttDetails))
     if mqttDetails['result']=="ok":
         logger.debug ("HA MQTT Service has been found at "+str(mqttDetails['data']['host']))
         mqtt_host=mqttDetails['data']['host']

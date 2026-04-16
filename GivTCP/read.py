@@ -2115,7 +2115,7 @@ def processData(plant: Plant):
         if len(regCacheStack)>0:
             #earliest_cache_age=(datetime.datetime.now(GivLUT.timezone)-datetime.datetime.strptime(finditem(regCacheStack[0],"Invertor_Time"), '%Y-%m-%dT%H:%M:%S%z'))
             #if earliest_cache_age.seconds>3600:
-            if len(regCacheStack)>10:
+            if len(regCacheStack)>30:
                 regCacheStack.pop(0)
         regCacheStack.append(multi_output)
         GivLUT.put_regcache(regCacheStack)
@@ -2674,25 +2674,26 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                             return oldData
 
         ## Now smooth data
-                if lookup.smooth and not GiV_Settings.data_smoother.lower() == "none":     # apply smoothing if required
-                    if newData != oldData:  # Only if its not the same
-                        if any(word in name.lower() for word in ["power","_to_"]):
-                            if abs(newData-oldData)>abssmooth:                                
-                                if checkRawcache(newData,name,abssmooth): #If new data is persistently outside bounds then use new value
-                                    return(newData)
-                                else:
-                                    logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
-                                    return (oldData)
-                        else:
-                            ## Only smooth data if its not already Zero (avoid div by Zero)
-                            if oldData != 0:
-                                if abs(newData-oldData) < 1: # ignore very small changes (eg. today energy stats at start of day)
-                                    return (newData)
-                                timeDelta = (now-then).total_seconds()
-                                dataDelta = abs(newData-oldData)/oldData    #Should it be a ratio or an abs value as low values easily meet the threshold
-                                if dataDelta > smoothRate and timeDelta < 60:
-                                    logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
-                                    return (oldData)
+##### Remove this if using outlier????
+#                if lookup.smooth and not GiV_Settings.data_smoother.lower() == "none":     # apply smoothing if required
+#                    if newData != oldData:  # Only if its not the same
+#                        if any(word in name.lower() for word in ["power","_to_"]):
+#                            if abs(newData-oldData)>abssmooth:                                
+#                                if checkRawcache(newData,name,abssmooth): #If new data is persistently outside bounds then use new value
+#                                    return(newData)
+#                                else:
+#                                    logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
+#                                    return (oldData)
+#                        else:
+#                            ## Only smooth data if its not already Zero (avoid div by Zero)
+#                            if oldData != 0:
+#                                if abs(newData-oldData) < 1: # ignore very small changes (eg. today energy stats at start of day)
+#                                    return (newData)
+#                                timeDelta = (now-then).total_seconds()
+#                                dataDelta = abs(newData-oldData)/oldData    #Should it be a ratio or an abs value as low values easily meet the threshold
+#                                if dataDelta > smoothRate and timeDelta < 60:
+#                                    logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
+#                                    return (oldData)
         else:
             logger.debug("Nonetype in old or new data for "+str(name)+" so using new value")
     except Exception as e:
