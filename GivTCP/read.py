@@ -2652,6 +2652,11 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
 
         ## Check Midnight Today as special case before checking for Zero
                 if now.hour == 0 and now.minute < 5 and "Today" in name:  # Treat Today stats as a special case - allow 5 min window for inverter clock drift
+                    if oldData > 1 and newData >= oldData * 0.5:
+                        # Inverter register hasn't reset yet - still showing yesterday's value.
+                        # Force 0 to hold the midnight reset until the register catches up.
+                        logger.debug("Midnight and "+str(name)+" inverter not yet reset ("+str(newData)+" vs yesterday "+str(oldData)+") - holding at 0")
+                        return 0.0
                     logger.debug("Midnight and "+str(name)+" so accepting value as is: "+str(newData))
                     return (newData)
         ## Now discard non-allowed Zero datapoints
@@ -2665,6 +2670,10 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
         ## Now check if its increasing
                 if lookup.onlyIncrease:  # if data can only increase then check
                     if (oldData-newData) > 0.11:
+                        if "Today" in name and newData <= 0.5:
+                            # Allow Today stats to drop to near-zero — genuine midnight reset
+                            logger.debug(str(name)+" Today stat reset to near-zero - accepting midnight reset value: "+str(newData))
+                            return newData
                         logger.debug(str(name)+" has decreased so using old value")
                         return oldData
                     if oldData > 1 and newData > oldData:
