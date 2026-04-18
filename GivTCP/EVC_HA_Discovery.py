@@ -168,24 +168,22 @@ class HAMQTT():
             if len(str(topic).split("/"))>5:    #Its a battery
                 tempObj["name"]=item.replace("_"," ") #Just final bit past the last "/"
                 tempObj['unique_id']=GiV_Settings.ha_device_prefix+"_"+str(topic).split("/")[4]+"_"+item
-                tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+str(topic).split("/")[4]+"_"+item
+                tempObj['default_entity_id']=GiV_Settings.ha_device_prefix+"_"+str(topic).split("/")[4]+"_"+item
                 tempObj['device']['identifiers']=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[4]
                 tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[4].replace("_"," ")
             else:
                 tempObj["name"]=item.replace("_"," ") #Just final bit past the last "/"
                 tempObj['unique_id']=GiV_Settings.ha_device_prefix+"_"+device+"_"+item
-                tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+device+"_"+item
+                tempObj['default_entity_id']=GiV_Settings.ha_device_prefix+"_"+device+"_"+item
                 tempObj['device']['identifiers']=GiV_Settings.ha_device_prefix+" "+device
                 tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+device.replace("_"," ")
         elif len(SN)>10:    #If EVC and not INV
             tempObj['unique_id']=GiV_Settings.ha_device_prefix+"_"+SN+"_"+item
-            tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+SN+"_"+item
             tempObj['device']['identifiers']=SN+"_"+GiVTCP_Device
             tempObj['device']['name']="GivEVC"#+str(GiVTCP_Device).replace("_"," ")
             tempObj["name"]=item.replace("_"," ") #Just final bit past the last "/"
         else:
             tempObj['unique_id']=GiV_Settings.ha_device_prefix+"_"+SN+"_"+item
-            tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+SN+"_"+item
             tempObj['device']['identifiers']=SN+"_"+GiVTCP_Device
             tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+str(GiVTCP_Device).replace("_"," ")
             tempObj["name"]=item.replace("_"," ") #Just final bit past the last "/"
@@ -195,6 +193,8 @@ class HAMQTT():
         tempObj['device']['model']=inv_type
 
         entity_type2= Entity_Type.entity_type[item]
+        
+        tempObj['default_entity_id']=entity_type2.devType+"."+GiV_Settings.ha_device_prefix+"_"+SN+"_"+item
 
         if not entity_type2.controlFunc == "":
             tempObj['command_topic']=GiV_Settings.MQTT_Topic+"/control/"+SN+"/"+entity_type2.controlFunc
@@ -202,6 +202,7 @@ class HAMQTT():
 #set device specific elements here:
         if entity_type2.devType=="sensor":
             tempObj['unit_of_meas']=""
+            
             if entity_type2.sensorClass=="energy":
                 tempObj['unit_of_meas']="kWh"
                 tempObj['device_class']="Energy"
