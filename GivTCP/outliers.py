@@ -122,7 +122,7 @@ def outlierRemoval(latest_data,CacheStack):
         else:
             cleanFlatStack[item]=flatstack[item]
     if outliercount > 0:
-        logger.info(str(outliercount)+" - outliers found, fixing with interpolated good data")
+        logger.debug(str(outliercount)+" - outliers found, fixing with interpolated good data")
 ### NOW put back in the right place...
     for item in cleanFlatStack:
         #find its location in regCache
