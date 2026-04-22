@@ -2045,6 +2045,25 @@ def processData(plant: Plant):
         else:
             multi_output=processInverterInfo(plant)
 
+        # Prevent stale inverter registers from overriding the midnight reset during the 5-min window.
+        # resetTodayStats() publishes zeros directly to MQTT but does not update the cache, so the next
+        # read cycle can re-publish yesterday's register values on top of the reset. Zeroing here
+        # (before dataCleansing) ensures the cache gets updated with 0s, after which dataSmoother2's
+        # onlyIncrease guard prevents any further false spikes for the rest of the day.
+        _now = datetime.datetime.now(tz=GivLUT.timezone)
+        if (_now.hour == 0 and _now.minute < 5
+                and getattr(GivLUT, '_last_midnight_reset', None) == _now.date()
+                and multi_output
+                and "Energy" in multi_output
+                and "Today" in multi_output["Energy"]):
+            stale_fields = {k: v for k, v in multi_output["Energy"]["Today"].items() if v > 0}
+            if stale_fields:
+                logger.info("Midnight window: zeroing stale Today energy values to prevent post-reset spike: " + str(stale_fields))
+            else:
+                logger.debug("Midnight window: Today energy values already zero, no action needed")
+            for k in multi_output["Energy"]["Today"]:
+                multi_output["Energy"]["Today"][k] = 0
+
         if not multi_output:
             raise Exception ("Process Data Failure")
 
@@ -2655,7 +2674,7 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                     if oldData > 1 and newData >= oldData * 0.5:
                         # Inverter register hasn't reset yet - still showing yesterday's value.
                         # Force 0 to hold the midnight reset until the register catches up.
-                        logger.debug("Midnight and "+str(name)+" inverter not yet reset ("+str(newData)+" vs yesterday "+str(oldData)+") - holding at 0")
+                        logger.info("Midnight window: "+str(name)+" inverter register not yet reset (new="+str(newData)+" >= 50% of yesterday="+str(oldData)+") - holding at 0")
                         return 0.0
                     logger.debug("Midnight and "+str(name)+" so accepting value as is: "+str(newData))
                     return (newData)
