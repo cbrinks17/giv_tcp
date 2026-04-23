@@ -47,6 +47,16 @@ def commsFailure():
     return oldDataCount
 
 def resetTodayStats():
+    # Snapshot yesterday's totals before zeroing so the midnight window can detect stale register values
+    try:
+        regCacheStack = GivLUT.get_regcache()
+        if regCacheStack:
+            yesterday_today = finditem(regCacheStack[-1], "Today")
+            GivLUT._yesterday_today_totals = dict(yesterday_today) if yesterday_today else {}
+        else:
+            GivLUT._yesterday_today_totals = {}
+    except Exception:
+        GivLUT._yesterday_today_totals = {}
     # end value 0 to all "Today stats"
     Today={'Today':{'AC_Charge_Energy_Today_kWh': 0, 'Battery_Charge_Energy_Today_kWh': 0, 'Battery_Discharge_Energy_Today_kWh': 0, 'Battery_Throughput_Today_kWh': 0, 'Export_Energy_Today_kWh': 0, 'Import_Energy_Today_kWh': 0, 'Invertor_Energy_Today_kWh': 0, 'Load_Energy_Today_kWh': 0, 'PV_Energy_Today_kWh': 0, 'Self_Consumption_Energy_Today_kWh': 0}}
     GivMQTT.multi_MQTT_publish("GivEnergy/"+GiV_Settings.serial_number+"/Energy/",Today)
@@ -2045,24 +2055,27 @@ def processData(plant: Plant):
         else:
             multi_output=processInverterInfo(plant)
 
-        # Prevent stale inverter registers from overriding the midnight reset during the 5-min window.
-        # resetTodayStats() publishes zeros directly to MQTT but does not update the cache, so the next
-        # read cycle can re-publish yesterday's register values on top of the reset. Zeroing here
-        # (before dataCleansing) ensures the cache gets updated with 0s, after which dataSmoother2's
-        # onlyIncrease guard prevents any further false spikes for the rest of the day.
+        # Zero Today values that are still showing yesterday's totals (stale inverter registers not yet reset).
+        # resetTodayStats() snapshots yesterday's totals; any field still >= 50% of that snapshot is stale.
+        # Zeroing here (before dataCleansing) updates the cache, after which dataSmoother2's onlyIncrease
+        # guard prevents further spikes for the rest of the day.
         _now = datetime.datetime.now(tz=GivLUT.timezone)
         if (_now.hour == 0 and _now.minute < 5
                 and getattr(GivLUT, '_last_midnight_reset', None) == _now.date()
                 and multi_output
                 and "Energy" in multi_output
                 and "Today" in multi_output["Energy"]):
-            stale_fields = {k: v for k, v in multi_output["Energy"]["Today"].items() if v > 0}
+            yesterday = getattr(GivLUT, '_yesterday_today_totals', {})
+            stale_fields = {
+                k: v for k, v in multi_output["Energy"]["Today"].items()
+                if yesterday.get(k, 0) > 0 and v >= yesterday[k] * 0.5
+            }
             if stale_fields:
                 logger.info("Midnight window: zeroing stale Today energy values to prevent post-reset spike: " + str(stale_fields))
+                for k in stale_fields:
+                    multi_output["Energy"]["Today"][k] = 0
             else:
-                logger.debug("Midnight window: Today energy values already zero, no action needed")
-            for k in multi_output["Energy"]["Today"]:
-                multi_output["Energy"]["Today"][k] = 0
+                logger.debug("Midnight window: no stale Today energy values detected")
 
         if not multi_output:
             raise Exception ("Process Data Failure")
