@@ -47,14 +47,39 @@ def commsFailure():
     return oldDataCount
 
 def resetTodayStats():
-    # Snapshot yesterday's totals before zeroing so the midnight window can detect stale register values
+    # Snapshot yesterday's totals before zeroing so the midnight window can detect stale register values.
+    # The snapshot is persisted to disk so it survives across worker processes and restarts.
     try:
+        today = datetime.datetime.now(tz=GivLUT.timezone).date()
         regCacheStack = GivLUT.get_regcache()
+        snapshot = {}
         if regCacheStack:
             yesterday_today = finditem(regCacheStack[-1], "Today")
-            GivLUT._yesterday_today_totals = dict(yesterday_today) if yesterday_today else {}
+            snapshot = dict(yesterday_today) if yesterday_today else {}
+        if sum(snapshot.values()) > 0.1:
+            # Cache has real yesterday values — save to disk before they get zeroed
+            GivLUT._yesterday_today_totals = snapshot
+            try:
+                with open(GivLUT.yesterdaytodaypkl, 'wb') as f:
+                    pickle.dump({'date': today, 'totals': snapshot}, f, pickle.HIGHEST_PROTOCOL)
+                logger.debug("Midnight reset: persisted yesterday Today snapshot to disk")
+            except Exception:
+                logger.warning("Midnight reset: could not persist yesterday Today snapshot to disk")
         else:
-            GivLUT._yesterday_today_totals = {}
+            # Cache already zeroed (another worker ran the reset first); load the snapshot saved earlier
+            try:
+                if exists(GivLUT.yesterdaytodaypkl):
+                    with open(GivLUT.yesterdaytodaypkl, 'rb') as f:
+                        saved = pickle.load(f)
+                    if saved.get('date') == today:
+                        GivLUT._yesterday_today_totals = saved.get('totals', {})
+                        logger.info("Midnight reset: loaded yesterday Today snapshot from disk (cache already zeroed): " + str(GivLUT._yesterday_today_totals))
+                    else:
+                        GivLUT._yesterday_today_totals = {}
+                else:
+                    GivLUT._yesterday_today_totals = {}
+            except Exception:
+                GivLUT._yesterday_today_totals = {}
     except Exception:
         GivLUT._yesterday_today_totals = {}
     # end value 0 to all "Today stats"
@@ -2056,16 +2081,25 @@ def processData(plant: Plant):
             multi_output=processInverterInfo(plant)
 
         # Zero Today values that are still showing yesterday's totals (stale inverter registers not yet reset).
-        # resetTodayStats() snapshots yesterday's totals; any field still >= 50% of that snapshot is stale.
-        # Zeroing here (before dataCleansing) updates the cache, after which dataSmoother2's onlyIncrease
-        # guard prevents further spikes for the rest of the day.
+        # resetTodayStats() snapshots yesterday's totals to disk; any field still >= 50% of that snapshot is stale.
         _now = datetime.datetime.now(tz=GivLUT.timezone)
         if (_now.hour == 0 and _now.minute < 5
-                and getattr(GivLUT, '_last_midnight_reset', None) == _now.date()
                 and multi_output
                 and "Energy" in multi_output
                 and "Today" in multi_output["Energy"]):
             yesterday = getattr(GivLUT, '_yesterday_today_totals', {})
+            if not yesterday:
+                # Not in memory (different worker process or restarted mid-window); load from disk
+                try:
+                    if exists(GivLUT.yesterdaytodaypkl):
+                        with open(GivLUT.yesterdaytodaypkl, 'rb') as f:
+                            saved = pickle.load(f)
+                        if saved.get('date') == _now.date():
+                            yesterday = saved.get('totals', {})
+                            GivLUT._yesterday_today_totals = yesterday
+                            logger.info("Midnight window: loaded yesterday Today snapshot from disk for stale-value detection")
+                except Exception:
+                    pass
             stale_fields = {
                 k: v for k, v in multi_output["Energy"]["Today"].items()
                 if yesterday.get(k, 0) > 0 and v >= yesterday[k] * 0.5

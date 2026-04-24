@@ -252,6 +252,7 @@ class GivLUT:
     dayRateRequest=GiV_Settings.cache_location+"/.dayRateRequest_"+str(GiV_Settings.givtcp_instance)
     invippkl=GiV_Settings.cache_location+"/invIPList.pkl"
     firstrun=GiV_Settings.cache_location+"/.firstrun_"+str(GiV_Settings.givtcp_instance)
+    yesterdaytodaypkl=GiV_Settings.cache_location+"/yesterdayToday_"+str(GiV_Settings.givtcp_instance)+".pkl"
 
     if hasattr(GiV_Settings,'timezone'):                        # If in Addon, use the HA Supervisor timezone
         timezone=zoneinfo.ZoneInfo(key=GiV_Settings.timezone)
