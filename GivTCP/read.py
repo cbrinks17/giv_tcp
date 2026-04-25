@@ -2721,7 +2721,7 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                     if oldData > 1 and newData >= oldData * 0.5:
                         # Inverter register hasn't reset yet - still showing yesterday's value.
                         # Force 0 to hold the midnight reset until the register catches up.
-                        logger.info("Midnight window: "+str(name)+" inverter register not yet reset (new="+str(newData)+" >= 50% of yesterday="+str(oldData)+") - holding at 0")
+                        logger.info("Midnight window: "+str(name)+" inverter register not yet reset (inv_time="+str(inv_time)+", new="+str(newData)+" >= 50% of yesterday="+str(oldData)+") - holding at 0")
                         return 0.0
                     logger.debug("Midnight and "+str(name)+" so accepting value as is: "+str(newData))
                     return (newData)
