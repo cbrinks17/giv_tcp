@@ -2148,9 +2148,14 @@ def processData(plant: Plant):
 
 ### Outlier removal for multi_output
         if len(regCacheStack)>20:
-            logger.debug("Running outlier removal")
-            multi_output,regCacheStack  = outlierRemoval(multi_output,regCacheStack)
-            logger.debug("outlier removal Complete")
+            if _now.hour == 0 and _now.minute < 5:
+                # Skip during midnight window: the cache is full of yesterday's values, so IQR
+                # would flag the legitimate midnight zeros as outliers and interpolate them back.
+                logger.debug("Skipping outlier removal during midnight window to protect Today energy resets")
+            else:
+                logger.debug("Running outlier removal")
+                multi_output,regCacheStack  = outlierRemoval(multi_output,regCacheStack)
+                logger.debug("outlier removal Complete")
         else:
             logger.debug("outlier removal not carried out: cache too small")
 
