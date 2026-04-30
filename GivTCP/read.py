@@ -2639,7 +2639,11 @@ def dataCleansing(data, regCacheStack):
     # iterate multi_output to get each end result dict.
     # Loop that dict to validate against
     inv_time=datetime.datetime.strptime(finditem(data,"Invertor_Time"), '%Y-%m-%dT%H:%M:%S%z')
-    new_multi_output = loop_dict(data, regCacheStack, data['Stats']["Last_Updated_Time"],str(finditem(regCacheStack,"Invertor_Type")).lower(),inv_time)
+    try:
+        prev_inv_time = datetime.datetime.strptime(finditem(regCacheStack,"Invertor_Time"), '%Y-%m-%dT%H:%M:%S%z')
+    except Exception:
+        prev_inv_time = None
+    new_multi_output = loop_dict(data, regCacheStack, data['Stats']["Last_Updated_Time"],str(finditem(regCacheStack,"Invertor_Type")).lower(),inv_time, prev_inv_time)
     return(new_multi_output)
 
 
@@ -2655,7 +2659,7 @@ def dicttoList(array):
     return(safeoutput)
 
 
-def loop_dict(array, regCacheStack, lastUpdate, invtype,inv_time):
+def loop_dict(array, regCacheStack, lastUpdate, invtype, inv_time, prev_inv_time=None):
     safeoutput = {}
     # finaloutput={}
     # arrayout={}
@@ -2666,7 +2670,7 @@ def loop_dict(array, regCacheStack, lastUpdate, invtype,inv_time):
             continue
         if isinstance(output, dict):
             if p_load in regCacheStack:
-                temp = loop_dict(output, regCacheStack[p_load], lastUpdate,invtype,inv_time)
+                temp = loop_dict(output, regCacheStack[p_load], lastUpdate, invtype, inv_time, prev_inv_time)
                 safeoutput[p_load] = temp
                 logger.debug('Data cleansed for: '+str(p_load))
             else:
@@ -2676,13 +2680,13 @@ def loop_dict(array, regCacheStack, lastUpdate, invtype,inv_time):
             # run datasmoother on the data item
             # only run if old data exists otherwise return the existing value
             if p_load in regCacheStack:
-                safeoutput[p_load] = dataSmoother2([p_load, output], [p_load, regCacheStack[p_load]], lastUpdate, invtype, inv_time)
+                safeoutput[p_load] = dataSmoother2([p_load, output], [p_load, regCacheStack[p_load]], lastUpdate, invtype, inv_time, prev_inv_time)
             else:
                 logger.debug(p_load+" has no data in the cache so using new value.")
                 safeoutput[p_load] = output
     return(safeoutput)
 
-def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
+def dataSmoother2(dataNew, dataOld, lastUpdate, invtype, inv_time, prev_inv_time=None):
     # perform test to validate data and smooth out spikes
     try:
         newData = dataNew[1]
@@ -2752,7 +2756,11 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                         # Reject increases that exceed 2× max inverter power over the elapsed time.
                         # Catches bad register reads that jump many kWh in one cycle while allowing
                         # legitimate gaps. Applies to both Today and Total energy fields.
-                        elapsed_s = (now - then).total_seconds()
+                        if prev_inv_time is not None:
+                            elapsed_s = (now - prev_inv_time).total_seconds()
+                        else:
+                            elapsed_s = GiV_Settings.self_run_timer
+                        elapsed_s = max(float(GiV_Settings.self_run_timer), elapsed_s)
                         timeDelta_h = (elapsed_s if elapsed_s < 10800 else 10800) / 3600
                         if not '3ph' in invtype:
                             max_kwh = maxvalues.single_phase['maxPower'] * 2 / 1000 * timeDelta_h
