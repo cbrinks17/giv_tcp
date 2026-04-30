@@ -2760,7 +2760,7 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype, inv_time, prev_inv_time
                             elapsed_s = (now - prev_inv_time).total_seconds()
                         else:
                             elapsed_s = GiV_Settings.self_run_timer
-                        elapsed_s = max(float(GiV_Settings.self_run_timer), elapsed_s)
+                        elapsed_s = elapsed_s if elapsed_s > float(GiV_Settings.self_run_timer) else float(GiV_Settings.self_run_timer)
                         timeDelta_h = (elapsed_s if elapsed_s < 10800 else 10800) / 3600
                         if not '3ph' in invtype:
                             max_kwh = maxvalues.single_phase['maxPower'] * 2 / 1000 * timeDelta_h
