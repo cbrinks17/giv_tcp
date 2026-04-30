@@ -62,7 +62,7 @@ def resetTodayStats():
             try:
                 with open(GivLUT.yesterdaytodaypkl, 'wb') as f:
                     pickle.dump({'date': today, 'totals': snapshot}, f, pickle.HIGHEST_PROTOCOL)
-                logger.debug("Midnight reset: persisted yesterday Today snapshot to disk")
+                logger.info("Midnight reset: persisted yesterday Today snapshot to " + str(GivLUT.yesterdaytodaypkl))
             except Exception:
                 logger.warning("Midnight reset: could not persist yesterday Today snapshot to disk")
         else:
@@ -2723,10 +2723,11 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
 
         ## Check Midnight Today as special case before checking for Zero
                 if now.hour == 0 and now.minute < 5 and "Today" in name:  # Treat Today stats as a special case - allow 5 min window for inverter clock drift
-                    if oldData > 1 and newData >= oldData * 0.5:
-                        # Inverter register hasn't reset yet - still showing yesterday's value.
-                        # Force 0 to hold the midnight reset until the register catches up.
-                        logger.info("Midnight window: "+str(name)+" inverter register not yet reset (inv_time="+str(inv_time)+", new="+str(newData)+" >= 50% of yesterday="+str(oldData)+") - holding at 0")
+                    if newData > 1:
+                        # Any Today value above 1 kWh in the midnight window is a stale register.
+                        # Guard based on newData (not oldData) so it keeps working after the cache
+                        # updates to 0 from earlier midnight-window cycles.
+                        logger.info("Midnight window: "+str(name)+" inverter register not yet reset (inv_time="+str(inv_time)+", new="+str(newData)+") - holding at 0")
                         return 0.0
                     logger.debug("Midnight and "+str(name)+" so accepting value as is: "+str(newData))
                     return (newData)
@@ -2748,6 +2749,17 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                         logger.debug(str(name)+" has decreased so using old value")
                         return oldData
                     if oldData > 1 and newData > oldData:
+                        # Reject increases that exceed 2× max inverter power over the elapsed time.
+                        # Catches bad register reads that jump many kWh in one cycle while allowing
+                        # legitimate gaps. Applies to both Today and Total energy fields.
+                        timeDelta_h = min((now - then).total_seconds(), 10800) / 3600
+                        if not '3ph' in invtype:
+                            max_kwh = maxvalues.single_phase['maxPower'] * 2 / 1000 * timeDelta_h
+                        else:
+                            max_kwh = maxvalues.three_phase['maxPower'] * 2 / 1000 * timeDelta_h
+                        if (newData - oldData) > max_kwh:
+                            logger.info(str(name)+" spike rejected: +"+str(round(newData-oldData,2))+" kWh in "+str(round(timeDelta_h*60,1))+"min exceeds max "+str(round(max_kwh,2))+" kWh")
+                            return oldData
                         dataDelta = (newData - oldData) / oldData
                         if dataDelta > smoothRate:
                             logger.debug(str(name)+" increased too rapidly: "+str(oldData)+"->"+str(newData)+" so using previous value")

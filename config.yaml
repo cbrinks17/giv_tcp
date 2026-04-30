@@ -1,6 +1,6 @@
 name:  "GivTCP CB"
 description:  "TCP Modbus connection to MQTT/JSON for Givenergy Battery/PV Invertors"
-version:  "3.5.17-Update6"
+version:  "3.5.17-Update7"
 #image: britkat/giv_tcp-ma
 slug:  "givtcp"
 homeassistant_api: true
