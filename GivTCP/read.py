@@ -2754,21 +2754,31 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype, inv_time, prev_inv_time
                         return oldData
                     if oldData > 1 and newData > oldData:
                         # Reject increases that exceed 2× max inverter power over the elapsed time.
-                        # Catches bad register reads that jump many kWh in one cycle while allowing
-                        # legitimate gaps. Applies to both Today and Total energy fields.
+                        # The effective elapsed time scales with consecutive rejections: some registers
+                        # update less frequently than the polling interval, so a legitimate accumulation
+                        # looks like a spike on the first poll after a quiet period. Scaling by
+                        # (reject_count + 1) makes the threshold grow until the increase is plausible.
+                        # A genuine transient bad read recovers next cycle and resets the counter.
+                        if not hasattr(GivLUT, '_spike_reject_counts'):
+                            GivLUT._spike_reject_counts = {}
+                        reject_count = GivLUT._spike_reject_counts.get(name, 0)
                         if prev_inv_time is not None:
                             elapsed_s = (now - prev_inv_time).total_seconds()
                         else:
                             elapsed_s = GiV_Settings.self_run_timer
                         elapsed_s = elapsed_s if elapsed_s > float(GiV_Settings.self_run_timer) else float(GiV_Settings.self_run_timer)
-                        timeDelta_h = (elapsed_s if elapsed_s < 10800 else 10800) / 3600
+                        effective_elapsed_s = elapsed_s * (reject_count + 1)
+                        timeDelta_h = (effective_elapsed_s if effective_elapsed_s < 10800 else 10800) / 3600
                         if not '3ph' in invtype:
                             max_kwh = maxvalues.single_phase['maxPower'] * 2 / 1000 * timeDelta_h
                         else:
                             max_kwh = maxvalues.three_phase['maxPower'] * 2 / 1000 * timeDelta_h
                         if (newData - oldData) > max_kwh:
-                            logger.info(str(name)+" spike rejected: +"+str(round(newData-oldData,2))+" kWh in "+str(round(timeDelta_h*60,1))+"min exceeds max "+str(round(max_kwh,2))+" kWh")
+                            logger.info(str(name)+" spike rejected ("+str(reject_count+1)+"): +"+str(round(newData-oldData,2))+" kWh in "+str(round(effective_elapsed_s/60,1))+"min (effective) exceeds max "+str(round(max_kwh,2))+" kWh")
+                            GivLUT._spike_reject_counts[name] = reject_count + 1
                             return oldData
+                        else:
+                            GivLUT._spike_reject_counts[name] = 0
                         dataDelta = (newData - oldData) / oldData
                         if dataDelta > smoothRate:
                             logger.debug(str(name)+" increased too rapidly: "+str(oldData)+"->"+str(newData)+" so using previous value")
