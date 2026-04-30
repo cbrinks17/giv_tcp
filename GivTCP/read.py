@@ -2639,7 +2639,7 @@ def dataCleansing(data, regCacheStack):
     # iterate multi_output to get each end result dict.
     # Loop that dict to validate against
     inv_time=datetime.datetime.strptime(finditem(data,"Invertor_Time"), '%Y-%m-%dT%H:%M:%S%z')
-    new_multi_output = loop_dict(data, regCacheStack, str(finditem(regCacheStack,"Invertor_Type")).lower(), inv_time)
+    new_multi_output = loop_dict(data, regCacheStack, data['Stats']["Last_Updated_Time"], str(finditem(regCacheStack,"Invertor_Type")).lower(), inv_time)
     return(new_multi_output)
 
 
@@ -2655,7 +2655,7 @@ def dicttoList(array):
     return(safeoutput)
 
 
-def loop_dict(array, regCacheStack, invtype, inv_time):
+def loop_dict(array, regCacheStack, lastUpdate, invtype, inv_time):
     safeoutput = {}
     for p_load in array:
         output = array[p_load]
@@ -2664,7 +2664,7 @@ def loop_dict(array, regCacheStack, invtype, inv_time):
             continue
         if isinstance(output, dict):
             if p_load in regCacheStack:
-                temp = loop_dict(output, regCacheStack[p_load], invtype, inv_time)
+                temp = loop_dict(output, regCacheStack[p_load], lastUpdate, invtype, inv_time)
                 safeoutput[p_load] = temp
                 logger.debug('Data cleansed for: '+str(p_load))
             else:
@@ -2674,13 +2674,13 @@ def loop_dict(array, regCacheStack, invtype, inv_time):
             # run datasmoother on the data item
             # only run if old data exists otherwise return the existing value
             if p_load in regCacheStack:
-                safeoutput[p_load] = dataSmoother2([p_load, output], [p_load, regCacheStack[p_load]], invtype, inv_time)
+                safeoutput[p_load] = dataSmoother2([p_load, output], [p_load, regCacheStack[p_load]], lastUpdate, invtype, inv_time)
             else:
                 logger.debug(p_load+" has no data in the cache so using new value.")
                 safeoutput[p_load] = output
     return(safeoutput)
 
-def dataSmoother2(dataNew, dataOld, invtype, inv_time):
+def dataSmoother2(dataNew, dataOld, lastUpdate, invtype, inv_time):
     # perform test to validate data and smooth out spikes
     try:
         newData = dataNew[1]
@@ -2717,6 +2717,7 @@ def dataSmoother2(dataNew, dataOld, invtype, inv_time):
                     else:
                         max=lookup.max
                 now = inv_time
+                then = datetime.datetime.fromisoformat(lastUpdate)
 
         ## Check Midnight Today as special case before checking for Zero
                 if now.hour == 0 and now.minute < 5 and "Today" in name:  # Treat Today stats as a special case - allow 5 min window for inverter clock drift
