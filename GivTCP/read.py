@@ -2752,7 +2752,8 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                         # Reject increases that exceed 2× max inverter power over the elapsed time.
                         # Catches bad register reads that jump many kWh in one cycle while allowing
                         # legitimate gaps. Applies to both Today and Total energy fields.
-                        timeDelta_h = min((now - then).total_seconds(), 10800) / 3600
+                        elapsed_s = (now - then).total_seconds()
+                        timeDelta_h = (elapsed_s if elapsed_s < 10800 else 10800) / 3600
                         if not '3ph' in invtype:
                             max_kwh = maxvalues.single_phase['maxPower'] * 2 / 1000 * timeDelta_h
                         else:
