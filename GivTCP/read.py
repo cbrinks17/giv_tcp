@@ -2639,11 +2639,7 @@ def dataCleansing(data, regCacheStack):
     # iterate multi_output to get each end result dict.
     # Loop that dict to validate against
     inv_time=datetime.datetime.strptime(finditem(data,"Invertor_Time"), '%Y-%m-%dT%H:%M:%S%z')
-    try:
-        prev_inv_time = datetime.datetime.strptime(finditem(regCacheStack,"Invertor_Time"), '%Y-%m-%dT%H:%M:%S%z')
-    except Exception:
-        prev_inv_time = None
-    new_multi_output = loop_dict(data, regCacheStack, data['Stats']["Last_Updated_Time"],str(finditem(regCacheStack,"Invertor_Type")).lower(),inv_time, prev_inv_time)
+    new_multi_output = loop_dict(data, regCacheStack, str(finditem(regCacheStack,"Invertor_Type")).lower(), inv_time)
     return(new_multi_output)
 
 
@@ -2659,10 +2655,8 @@ def dicttoList(array):
     return(safeoutput)
 
 
-def loop_dict(array, regCacheStack, lastUpdate, invtype, inv_time, prev_inv_time=None):
+def loop_dict(array, regCacheStack, invtype, inv_time):
     safeoutput = {}
-    # finaloutput={}
-    # arrayout={}
     for p_load in array:
         output = array[p_load]
         if p_load == "raw":  # skip data cleansing for raw data
@@ -2670,7 +2664,7 @@ def loop_dict(array, regCacheStack, lastUpdate, invtype, inv_time, prev_inv_time
             continue
         if isinstance(output, dict):
             if p_load in regCacheStack:
-                temp = loop_dict(output, regCacheStack[p_load], lastUpdate, invtype, inv_time, prev_inv_time)
+                temp = loop_dict(output, regCacheStack[p_load], invtype, inv_time)
                 safeoutput[p_load] = temp
                 logger.debug('Data cleansed for: '+str(p_load))
             else:
@@ -2680,13 +2674,13 @@ def loop_dict(array, regCacheStack, lastUpdate, invtype, inv_time, prev_inv_time
             # run datasmoother on the data item
             # only run if old data exists otherwise return the existing value
             if p_load in regCacheStack:
-                safeoutput[p_load] = dataSmoother2([p_load, output], [p_load, regCacheStack[p_load]], lastUpdate, invtype, inv_time, prev_inv_time)
+                safeoutput[p_load] = dataSmoother2([p_load, output], [p_load, regCacheStack[p_load]], invtype, inv_time)
             else:
                 logger.debug(p_load+" has no data in the cache so using new value.")
                 safeoutput[p_load] = output
     return(safeoutput)
 
-def dataSmoother2(dataNew, dataOld, lastUpdate, invtype, inv_time, prev_inv_time=None):
+def dataSmoother2(dataNew, dataOld, invtype, inv_time):
     # perform test to validate data and smooth out spikes
     try:
         newData = dataNew[1]
@@ -2723,7 +2717,6 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype, inv_time, prev_inv_time
                     else:
                         max=lookup.max
                 now = inv_time
-                then = datetime.datetime.fromisoformat(lastUpdate)
 
         ## Check Midnight Today as special case before checking for Zero
                 if now.hour == 0 and now.minute < 5 and "Today" in name:  # Treat Today stats as a special case - allow 5 min window for inverter clock drift
@@ -2753,32 +2746,6 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype, inv_time, prev_inv_time
                         logger.debug(str(name)+" has decreased so using old value")
                         return oldData
                     if oldData > 1 and newData > oldData:
-                        # Reject increases that exceed 2× max inverter power over the elapsed time.
-                        # The effective elapsed time scales with consecutive rejections: some registers
-                        # update less frequently than the polling interval, so a legitimate accumulation
-                        # looks like a spike on the first poll after a quiet period. Scaling by
-                        # (reject_count + 1) makes the threshold grow until the increase is plausible.
-                        # A genuine transient bad read recovers next cycle and resets the counter.
-                        if not hasattr(GivLUT, '_spike_reject_counts'):
-                            GivLUT._spike_reject_counts = {}
-                        reject_count = GivLUT._spike_reject_counts.get(name, 0)
-                        if prev_inv_time is not None:
-                            elapsed_s = (now - prev_inv_time).total_seconds()
-                        else:
-                            elapsed_s = GiV_Settings.self_run_timer
-                        elapsed_s = elapsed_s if elapsed_s > float(GiV_Settings.self_run_timer) else float(GiV_Settings.self_run_timer)
-                        effective_elapsed_s = elapsed_s * (reject_count + 1)
-                        timeDelta_h = (effective_elapsed_s if effective_elapsed_s < 10800 else 10800) / 3600
-                        if not '3ph' in invtype:
-                            max_kwh = maxvalues.single_phase['maxPower'] * 2 / 1000 * timeDelta_h
-                        else:
-                            max_kwh = maxvalues.three_phase['maxPower'] * 2 / 1000 * timeDelta_h
-                        if (newData - oldData) > max_kwh:
-                            logger.info(str(name)+" spike rejected ("+str(reject_count+1)+"): +"+str(round(newData-oldData,2))+" kWh in "+str(round(effective_elapsed_s/60,1))+"min (effective) exceeds max "+str(round(max_kwh,2))+" kWh")
-                            GivLUT._spike_reject_counts[name] = reject_count + 1
-                            return oldData
-                        else:
-                            GivLUT._spike_reject_counts[name] = 0
                         dataDelta = (newData - oldData) / oldData
                         if dataDelta > smoothRate:
                             logger.debug(str(name)+" increased too rapidly: "+str(oldData)+"->"+str(newData)+" so using previous value")
